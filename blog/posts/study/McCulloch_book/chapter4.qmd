@@ -1,0 +1,293 @@
+---
+title: "Chapter 4 Exercise Review"
+date: "2025-03-04"
+categories: [study]
+---
+
+### 4.1
+
+**아래모형을 보고** $\mathbf{X}$ 와 $\pmb{\beta}$의 형태를 Kronecker product을 사용해서 표현해라
+
+$$
+\text{E}[y_{ij}] = \mu + \alpha_i + \beta_j, \quad \text{for }\ i = 1,2,\cdots,m \ \text{ and }\ j=1,2,\cdots,n 
+$$
+
+$\pmb{X}$를 Kronecker product으로 표현하기 전에 설계행렬을 보여보자
+
+$m=3, n=4$라고 했을 때 행렬은 다음과 같다.
+
+$$
+\mathbf{X}=\left[\begin{array}{llllllll}
+1 & 1 & 0 & 0 & 1 & 0 & 0 & 0 \\
+1 & 1 & 0 & 0 & 0 & 1 & 0 & 0 \\
+1 & 1 & 0 & 0 & 0 & 0 & 1 & 0 \\
+1 & 1 & 0 & 0 & 0 & 0 & 0 & 1 \\
+1 & 0 & 1 & 0 & 1 & 0 & 0 & 0 \\
+1 & 0 & 1 & 0 & 0 & 1 & 0 & 0 \\
+1 & 0 & 1 & 0 & 0 & 0 & 1 & 0 \\
+1 & 0 & 1 & 0 & 0 & 0 & 0 & 1 \\
+1 & 0 & 0 & 1 & 1 & 0 & 0 & 0 \\
+1 & 0 & 0 & 1 & 0 & 1 & 0 & 0 \\
+1 & 0 & 0 & 1 & 0 & 0 & 1 & 0 \\
+1 & 0 & 0 & 1 & 0 & 0 & 0 & 1
+\end{array}\right]
+$$
+
+$\alpha$들과 $\beta$들의 위치가 어떠한지 잘 확인해본다.
+
+그럼 이제 Kronecker product를 사용해 표현해본다면 다음과 같다.
+
+$$
+\mathbf{y}=\mathbf{X} \boldsymbol{\beta}, \quad \mathbf{X}=\left[\mathbf{1}_{m n}, I_m \otimes \mathbf{1}_n, \mathbf{1}_m \otimes I_n\right], \quad \boldsymbol{\beta}=\left(\mu, \alpha_1, \ldots, \alpha_m, \beta_1, \ldots, \beta_n\right)^{\top} .
+$$
+
+### 4.2
+
+**다음과 같이 주어진 2개의 회귀모형이 있다. 이것을 갖고 다음 (a)\~(d)문제를 풀어라**
+
+$$
+\mathrm{E}\left[y_i\right]=\alpha+\gamma x_i \quad \text { and } \quad \mathrm{E}\left[y_i\right]=\mu+\gamma\left(x_i-\bar{x}\right) \quad \text{for}\ i=1,2,\cdots,n
+$$
+
+#### a
+
+**각 모형의** $\mathrm{E}[\mathbf{y}]=\mathbf{X} \boldsymbol{\beta}$를 전개해서 보이기
+
+1.  모형 1
+
+$$
+\boldsymbol{\beta}=\binom{\alpha}{\gamma},
+\quad
+\mathbf{X}=\left(\begin{array}{cc}
+1 & x_1 \\
+1 & x_2 \\
+\vdots & \vdots \\
+1 & x_n
+\end{array}\right),
+$$
+
+따라서
+
+$$
+E[\mathbf{y}]=\mathbf{X} \beta=\left(\begin{array}{cc}
+1 & x_1 \\
+1 & x_2 \\
+\vdots & \vdots \\
+1 & x_n
+\end{array}\right)\binom{\alpha}{\gamma}=\left(\begin{array}{c}
+\alpha+\gamma x_1 \\
+\alpha+\gamma x_2 \\
+\vdots \\
+\alpha+\gamma x_n
+\end{array}\right)
+$$
+
+2.  모형 2
+
+계획행렬만 다르기에 확인해보면 다음과 같다.
+
+$$
+\mathbf{X}=\left(\begin{array}{cc}
+1 & \left(x_1-\bar{x}\right) \\
+1 & \left(x_2-\bar{x}\right) \\
+\vdots & \vdots \\
+1 & \left(x_n-\bar{x}\right)
+\end{array}\right)
+$$
+
+정리하면
+
+$$
+E[\mathbf{y}]=\mathbf{X} \boldsymbol{\beta}=\left(\begin{array}{cc}
+1 & x_1-\bar{x} \\
+1 & x_2-\bar{x} \\
+\vdots & \vdots \\
+1 & x_n-\bar{x}
+\end{array}\right)\binom{\mu}{\gamma}=\left(\begin{array}{c}
+\mu+\gamma\left(x_1-\bar{x}\right) \\
+\mu+\gamma\left(x_2-\bar{x}\right) \\
+\vdots \\
+\mu+\gamma\left(x_n-\bar{x}\right)
+\end{array}\right)
+$$
+
+#### b
+
+$\mathbf{X}^{\prime} \mathbf{X},\left(\mathbf{X}^{\prime} \mathbf{X}\right)^{-1}$ 와 $\hat{\boldsymbol{\beta}}$ 계산하기
+
+1.  모형 1
+
+-   X 는 앞에서 언급한 $n \times 2$ 행렬이며,
+
+$$
+\mathbf{X}^{\top} \mathbf{X}=\left(\begin{array}{cc}
+\sum_{i=1}^n 1 & \sum_{i=1}^n x_i \\
+\sum_{i=1}^n x_i & \sum_{i=1}^n x_i^2
+\end{array}\right)=\left(\begin{array}{cc}
+n & \sum x_i \\
+\sum x_i & \sum x_i^2
+\end{array}\right) .
+$$
+
+-   $\mathbf{X}^{\top} \mathbf{X}$ 의 역행렬은 우리가 아는 $2\times2$행렬의 역행렬을 구하면 된다.
+
+$$
+\left(\mathbf{X}^{\top} \mathbf{X}\right)^{-1}=\frac{1}{n \sum x_i^2-\left(\sum x_i\right)^2}\left(\begin{array}{cc}
+\sum x_i^2 & -\sum x_i \\
+-\sum x_i & n
+\end{array}\right) .
+$$
+
+-   $\widehat{\boldsymbol{\beta}}=\left(\mathbf{X}^{\top} \mathbf{X}\right)^{-1} \mathbf{X}^{\top} \mathbf{y}$ 를 이용해
+
+$$
+\widehat{\alpha}=\bar{y}-\widehat{\gamma} \bar{x}, \quad \widehat{\gamma}=\frac{\sum_{i=1}^n\left(x_i-\bar{x}\right)\left(y_i-\bar{y}\right)}{\sum_{i=1}^n\left(x_i-\bar{x}\right)^2},
+$$
+
+2.  모형 2
+
+-   X 는 각 행이 $\left(1, x_i-\bar{x}\right)$.
+
+-   따라서
+
+$$
+\mathbf{X}^{\top} \mathbf{X}=\left(\begin{array}{cc}
+\sum_{i=1}^n 1 & \sum_{i=1}^n\left(x_i-\bar{x}\right) \\
+\sum_{i=1}^n\left(x_i-\bar{x}\right) & \sum_{i=1}^n\left(x_i-\bar{x}\right)^2
+\end{array}\right)=\left(\begin{array}{cc}
+n & 0 \\
+0 & \sum\left(x_i-\bar{x}\right)^2
+\end{array}\right)
+$$
+
+$$
+\text { 여기서 } \sum\left(x_i-\bar{x}\right)=0 \text { 임을 사용. }
+$$
+
+-   따라서
+
+$$
+\left(\mathbf{X}^{\top} \mathbf{X}\right)^{-1}=\left(\begin{array}{cc}
+\frac{1}{n} & 0 \\
+0 & 1 \\
+\sum\left(x_i-\bar{x}\right)^2
+\end{array}\right)
+$$
+
+-   $\widehat{\boldsymbol{\beta}}=\left(\mathbf{X}^{\top} \mathbf{X}\right)^{-1} \mathbf{X}^{\top} \mathbf{y}$ 를 행렬 곱 형태로 써 보면,
+
+$$
+\widehat{\mu}=\frac{1}{n} \sum_{i=1}^n y_i=\bar{y}, \quad \widehat{\gamma}=\frac{\sum_{i=1}^n\left(x_i-\bar{x}\right)\left(y_i-\bar{y}\right)}{\sum_{i=1}^n\left(x_i-\bar{x}\right)^2} .
+$$
+
+즉 모형 2에서는 $\mu$ 가 자료의 단순평균 $\bar{y}$ 와 일치하고, $\gamma$ 는 모형 (1)과 동일하게 추정됨을 알 수 있다.
+
+#### c.
+
+$var(\hat{\beta})$을 구하고 두 모형의 장단점 비교
+
+1.  모형 1 의 분산
+
+-   일반적으로 $\widehat{\boldsymbol{\beta}}$ 는 $\operatorname{Var}(\widehat{\boldsymbol{\beta}})=\sigma^2\left(\mathbf{X}^{\top} \mathbf{X}\right)^{-1}$.
+
+-   $2 \times 2$ 행렬이므로
+
+$$
+\operatorname{Var}\binom{\widehat{\alpha}}{\widehat{\gamma}}=\sigma^2 \cdot \frac{1}{n \sum x_i^2-\left(\sum x_i\right)^2}\left(\begin{array}{cc}
+\sum x_i^2 & -\sum x_i \\
+-\sum x_i & n
+\end{array}\right) .
+$$
+
+2.  모형 2 의 분산
+
+-   $\mathbf{X}^{\top} \mathbf{X}$ 가 대각형이므로
+
+$$
+\operatorname{Var}\binom{\widehat{\mu}}{\widehat{\gamma}}=\sigma^2\left(\begin{array}{cc}
+\frac{1}{n} & 0 \\
+0 & \frac{1}{\sum\left(x_i-\bar{x}\right)^2}
+\end{array}\right) .
+$$
+
+즉 $\widehat{\mu}$ 와 $\widehat{\gamma}$ 사이의 공분산이 0 이다.
+
+3.  두 모형중에 뭐가 좋을까
+
+-   모형 1에서는 두 모수간 음의 상관을 가지고, 모형 2에서는 두 모수간에 서로 직교해서 공분산이 0이되는 것을 볼 수 있다.
+
+-   해석의 관점에서는 모형 2는 절편을 $x$의 평균에서 응답값으로 직접 해석할 수 있고 $\mu$와 기울기 $\gamma$에 대한 분산 및 추정량이 독립은 아니지만 거의 상관없는 것이라 말할 수 있는 장점이 있다.
+
+#### d
+
+$\widehat{y}^*=\widehat{E}\left[y \mid x=x^*\right]$ 의 분산
+
+1.  모형 1
+
+-   예측하려는 $x^*$ 에 대하여, $\widehat{y}^*=\widehat{\alpha}+\widehat{\gamma} x^*$.
+
+-   이를 벡터 표기로 쓰면 $\widehat{y}^*=\left(\begin{array}{ll}1 & x^*\end{array}\right) \widehat{\boldsymbol{\beta}}$.
+
+따라서
+
+$$
+\begin{aligned}
+\operatorname{Var}\left(\widehat{y}^*\right)&=\sigma^2\left(\begin{array}{ll}
+1 & x^*
+\end{array}\right)\left(\mathbf{X}^{\top} \mathbf{X}\right)^{-1}\binom{1}{x^*} .\\
+&=\sigma^2\left[\frac{1}{n}+\frac{\left(x^*-\bar{x}\right)^2}{\sum_{i=1}^n\left(x_i-\bar{x}\right)^2}\right]\\
+\end{aligned}
+$$
+
+2.  모형 2
+
+-   $\widehat{y}^*=\widehat{\mu}+\widehat{\gamma}\left(x^*-\bar{x}\right)$
+
+-   벡터 표기로는 $\widehat{y}^*=\left(\begin{array}{ll}1 & x^*-\bar{x}\end{array}\right) \widehat{\boldsymbol{\beta}}$
+
+-   모형 (2)에서 $\left(\mathbf{X}^{\top} \mathbf{X}\right)^{-1}$ 가 대각행렬이므로
+
+$$
+\operatorname{Var}\left(\widehat{y}^*\right)=\sigma^2\left(\frac{1}{n}+\frac{\left(x^*-\bar{x}\right)^2}{\sum_{i=1}^n\left(x_i-\bar{x}\right)^2}\right)
+$$
+
+이는 곧 모형 (1)에서 얻은 공식과 정확히 동일하다.
+
+### 4.3
+
+1.  $\beta_z$ 정의
+
+$$
+\beta_z=\beta^0+\left(I-X^{-} X\right) z
+$$
+
+에서 $\beta^0=\left(X^{\top} X\right)^{-} X^{\top} y$ 를 $\beta_z$ 에 대입하면
+
+$$
+\beta_z=\left(X^{\top} X\right)^{-} X^{\top} y+\left(I-X^{-} X\right) z .
+$$
+
+2.  정규방정식 $X^{\top} X \beta_z=X^{\top} y$ 만족 여부 확인
+
+위 $\beta_z$ 가 실제로 정규방정식을 만족함을 보이려면 다음과 같은 식이 성립함을 증명하면 된다.
+
+$$
+X^{\top} X \beta_z=X^{\top} y
+$$
+
+$$
+\begin{aligned}
+X^{\top} X \beta_z & = X^{\top} X\left[\left(X^{\top} X\right)^{-} X^{\top} y+\left(I-X^{-} X\right) z\right]. \\
+& = X^{\top} X\left(X^{\top} X\right)^{-} X^{\top} y + X^{\top} X\left(I-X^{-} X\right) z. \\
+& = X^{\top}y \ + X^{\top}\underbrace{\left(X- \underbrace{XX^{-}X}_{=X}\right)}_{=0} z. \\
+& = X^{\top}y
+\end{aligned}
+$$
+
+3.  결론
+
+제시한 $\beta_z=\beta^0+\left(I-X^{-} X\right) z$가 $X^{\top} X \beta_z=X^{\top} y$의 또 다른 해(solution) 라는 것을 확인했다.
+
+## 쉬운부분이라 다음에 기회가 있으면 추후 진행
+
+### 4.4

@@ -1,0 +1,24 @@
+project:
+  type: website
+
+website:
+#  site-url: "https://StatJeong.quarto.org"
+  title: "Study Jeong"
+  navbar:
+    left:
+      - href: about.qmd
+        text: 소개
+      - icon: github
+        href: https://github.com/
+  page-navigation: true
+
+format:
+  html:
+    theme: journal
+    css: styles.css
+    toc: true           # ✅ 목차 활성화
+    toc-location: right # ✅ 목차 위치 (left/right)
+    toc-depth: 3        # ✅ 몇 단계 헤딩까지 보여줄지 (기본 3)
+    
+editor: visual
+

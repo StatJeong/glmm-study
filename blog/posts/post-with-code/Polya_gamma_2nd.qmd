@@ -1,0 +1,1029 @@
+---
+title: "Polya-Gamma latent variables"
+format:
+  html:
+    html-math-method: katex   # 수식 렌더링용 (MathJax도 가능)
+date: "2025-11-28"
+categories: [LMM, code, Bayesian]
+theorems:
+  numbering: by-section
+number-sections: true
+#image: "image.jpg"
+---
+
+# Polya–Gamma latent variables를 만들게 된 이유
+
+## 로지스틱/이항 모형의 베이지안 난점
+
+-   Probit 모형은 Albert & Chib (1993)의 latent $z_i$ 덕분에 $\beta$ \| $z$ 가 정규분포가 되어서 깔끔하게 Gibbs sampler를 돌릴 수 있습니다.
+
+-   그런데 logit 링크(로지스틱 회귀, 로지스틱 랜덤효과, 음이항 회귀 등)는 가능도 $\propto \prod\left(1+e^{x_i^{\top} \beta}\right)^{-n_i}$ 형태라서
+
+-   정규 prior와 conjugate하지 않고 $\beta$ 에 대한 완전조건부가 닫힌 형태가 아닙니다.
+
+그래서 기존에는:
+
+Metropolis-Hastings로 직접 $\beta$ 를 업데이트하거나
+
+로지스틱 분포를
+
+-   scale mixture of normals (Holmes & Held)
+
+-   finite mixture of normals (Frühwirth-Schnatter 등)
+
+로 근사해서 이중의 latent variable을 쓰는 방법들이 많이 쓰였습니다.
+
+문제는,
+
+-   근사가 들어가거나,
+
+-   latent 층이 여러 겹이라 알고리즘이 복잡하고 튜닝이 필요하며,
+
+-   복잡한 계층모형(공간, 시계열, 혼합모형)에 넣기가 번거롭다는 점입니다.
+
+이걸 한 방에 정리하려고 나온 게 Pólya-Gamma latent variables입니다.
+
+# Pólya-Gamma 분포: 정의와 핵심 아이디어
+
+## 정의
+
+Polson, Scott & Windle (2013)은 다음을 만족하는 새로운 분포를 정의합니다.
+
+-   $X \sim P G(b, c)$ (Pólya-Gamma 분포) 라고 쓰고,
+
+$$
+X \stackrel{d}{=} \frac{1}{2 \pi^2} \sum_{k=1}^{\infty} \frac{g_k}{(k-1 / 2)^2+c^2 /\left(4 \pi^2\right)}, \quad g_k \sim \operatorname{Gamma}(b, 1) \text { i.i.d. }
+$$
+
+를 만족합니다. (실제 구현은 이 무한합을 그대로 쓰지는 않고, accept-reject 알고리즘으로 샘플링합니다.)
+
+## 핵심 적분식
+
+이항(logit) 가능도함수 에서 등장하는 항은
+
+$$
+\frac{e^{\psi a}}{\left(1+e^\psi\right)^b}, \quad \psi=x^{\top} \beta .
+$$
+
+Polson et al.은 다음과 같은 정확한 적분 표현을 보입니다.
+
+$$
+\begin{aligned}
+\frac{e^{\psi a}}{\left(1+e^\psi\right)^b}=2^{-b} e^{\kappa \psi} \int_0^{\infty} & \exp \left(-\frac{\omega \psi^2}{2}\right) p(\omega) d \omega, \quad \kappa=a-\frac{b}{2} \\
+\omega & \sim \operatorname{PG}(b, 0)
+\end{aligned}
+$$
+
+즉,
+
+-   $\omega$ 를 Pólya-Gamma 분포에서 하나 뽑으면,
+
+조건부로
+
+$$
+\begin{aligned}
+p(\beta \mid y, \omega) & \propto \exp \left(-\frac{\omega}{2}\left(x^{\top} \beta\right)^2+\kappa x^{\top} \beta\right) \\ 
+& \propto \exp \left(-\frac{\omega x^2}{2}(\beta-m)^2\right), \quad m=\frac{\kappa}{\omega x} .
+\end{aligned}
+$$
+
+는 $\beta$ 에 대해 정규 커널의 형태를 띕니다.
+
+따라서 **latent 변수** $\omega_i$ 를 도입하면:
+
+-   $\beta \mid \omega, y$ 가 정규분포
+
+-   $\omega \mid \beta, y$ 가 다시 Pólya-Gamma 분포가 되어
+
+-   완전한 Gibbs sampler를 구성할 수 있습니다.
+
+# PG 데이터 보강 알고리즘 (로지스틱 회귀 예시)
+
+## 기본 세팅
+
+-   관촉: $y_i \sim \operatorname{Binom}\left(n_i, p_i\right)$
+
+-   링크: $\operatorname{logit}\left(p_i\right)=\psi_i=x_i^{\top} \beta$
+
+-   prior: $\beta \sim N(b, B)$
+
+각 $i$ 에 대해
+
+1.  Pólya-Gamma latent variable
+
+$$
+\omega_i \mid \beta, y \sim P G\left(n_i, x_i^{\top} \beta\right)
+$$
+
+를 샘플링.
+
+2.  $\omega_i$ 를 고정하면, 우도는
+
+$$
+\beta \mid \omega, y \sim N\left(m_\omega, V_\omega\right)
+$$
+
+끌의 정규분표가 됨 (일반 선형모형과 동일한 형태).
+
+즉,
+
+-   한 블륵: $\omega$ 전체를 PG 분포에서 샘플
+
+-   다른 블록: $\beta$ 를 정규분포에서 샘플
+
+만 반복하면 됩니다.
+
+# 왜 좋은가? (장점 요약)
+
+1.  **정확한(data augmentation) 기법**
+    -   Pólya–Gamma는 로지스틱 우도를 **정확하게** 정규분포의 mixture로 표현해 줍니다.
+    -   Laplace근사와 같은 편향이 발생되는 문제를 제거할수 있다.
+2.  **단층(latent one-layer) 구조**
+    -   관측마다 **PG 변수** $(\omega_i)$ 하나만 추가하면 되기 때문에 구조가 단순합니다.
+    -   복잡한 두 겹 latent 구조(dRUM, KS mixture 등)에 비해 구현이 훨씬 깔끔합니다.
+3.  **정규 prior와 완전 conjugacy**
+    -   $\beta \sim N(b, B)$를 두면\
+        $\beta \mid \omega, y$ 가 정규, $\omega \mid \beta, y$ 가 PG가 되어\
+        **Gibbs sampler**가 가능합니다.
+    -   로지스틱 GLMM, 공간/시계열 모형 등에 그대로 확장하기 좋다고 합니다.
+4.  **좋은 mixing 이론**
+    -   일부 설정에서 체인이 **uniformly ergodic**임이 증명되어 있고,
+    -   실험적으로도 잘 튜닝된 MH와 비슷하거나 더 좋은 효율을 보이는 경우가 많습니다.
+
+# 단점·한계 (요약)
+
+1.  **PG 샘플링 자체가 공짜는 아님**
+    -   PG(b, c)를 뽑기 위해 전용 accept–reject 샘플러가 필요하고,
+    -   관측마다 $\omega_i$를 하나씩 샘플해야 해서 **데이터가 아주 크면 비용 부담**이 있습니다.
+2.  **큰 count가 많은 음이항 회귀에서 비용 증가**
+    -   음이항 모형에서 $b$가 count와 연결될 때, $b$가 매우 크면 PG 샘플링이 느려질 수 있고,
+    -   단순 구조라면 기존 근사형 데이터 보강이 더 빠를 수 있습니다.
+3.  **logit 전용 도구**
+    -   logit / binomial 구조에는 매우 강력하지만,
+    -   다른 링크에는 바로 적용되지 않습니다.
+4.  **초대규모 데이터에서는 대안도 고려**
+    -   수십만·수백만 단위 데이터에서는
+    -   INLA, variational Bayes, Laplace 근사 등과의 계산량/정확도 trade-off를 비교할 필요가 있습니다.
+
+# 시뮬레이션
+
+## Model and Notation
+
+-   그룹(군집) 지표: $j = 1, \dots, J$
+
+-   그룹 $j$ 안의 관측: $i = 1, \dots, n_j$\
+    (시뮬레이션에서는 $n_j \equiv n_{\text{per}}$ 로 동일)
+
+-   관측값
+
+    -   반응변수: $Y_{ij} \in \{0,1\}$\
+    -   공변량: $X_{ij} \in \mathbb{R}$
+
+-   랜덤절편 로지스틱 GLMM
+
+$$
+Y_{ij} \mid p_{ij} \sim \text{Bernoulli}(p_{ij}),
+$$
+
+$$
+\text{logit}(p_{ij}) 
+= \log\frac{p_{ij}}{1-p_{ij}}
+= \beta_0 + \beta_1 X_{ij} + b_j ,
+$$
+
+$$
+b_j \mid \sigma_b^2 \sim N(0, \sigma_b^2), \quad j=1,\dots,J.
+$$
+
+편의상 전체 표본크기를 $N = \sum_{j=1}^J n_j$ 라고 쓰고,\
+벡터 표기를 위해
+
+-   $\mathbf{y} = (y_1,\dots,y_N)^\top,\ \mathbf{x} = (x_1,\dots,x_N)^\top$\
+-   그룹 인덱스 $\text{group}(i) \in \{1,\dots,J\}$\
+-   $\eta_i = \beta_0 + \beta_1 x_i + b_{\text{group}(i)}$\
+-   $p_i = \text{logit}^{-1}(\eta_i)$
+
+라고 둔다.
+
+------------------------------------------------------------------------
+
+## Likelihood
+
+독립 가정하에, $\theta = (\beta_0,\beta_1,b_1,\dots,b_J,\sigma_b^2)$ 에 대한 가능도는
+
+$$
+L(\theta; \mathbf{y})
+= \prod_{i=1}^N p_i^{y_i} (1-p_i)^{1-y_i}
+= \prod_{i=1}^N 
+\left\{
+\frac{\exp(\eta_i)}{1+\exp(\eta_i)}
+\right\}^{y_i}
+\left\{
+\frac{1}{1+\exp(\eta_i)}
+\right\}^{1-y_i}.
+$$
+
+로그 가능도는
+
+$$
+\ell(\theta; \mathbf{y})
+= \sum_{i=1}^N
+\Big\{
+y_i \eta_i - \log(1+\exp(\eta_i))
+\Big\}.
+$$
+
+------------------------------------------------------------------------
+
+## Priors (시뮬레이션에서 사용한 사전분포)
+
+고정효과에 대해 독립 정규 사전분포:
+
+$$
+\beta_0 \sim N(0, 10^2), \quad
+\beta_1 \sim N(0, 10^2).
+$$
+
+랜덤효과 분산에 대해 Inverse-Gamma(형상–rate 매개변수화) 사전분포:
+
+$$
+\sigma_b^2 \sim \text{Inv-Gamma}(a_0, b_0),
+$$
+
+즉 밀도는
+
+$$
+p(\sigma_b^2)
+\propto
+(\sigma_b^2)^{-(a_0+1)}
+\exp\!\left(-\frac{b_0}{\sigma_b^2}\right),
+\quad \sigma_b^2 > 0.
+$$
+
+랜덤효과 $b_j$ 들은
+
+$$
+b_j \mid \sigma_b^2 \sim N(0,\sigma_b^2),
+\quad j=1,\dots,J,
+$$
+
+로 독립이라고 가정한다.
+
+------------------------------------------------------------------------
+
+## Joint Posterior
+
+사후분포는 (정규화상수는 생략하고)
+
+$$
+p(\beta_0,\beta_1,\mathbf{b},\sigma_b^2 \mid \mathbf{y},\mathbf{x})
+\propto
+L(\theta; \mathbf{y})
+\,
+p(\beta_0)\,p(\beta_1)\,
+\left\{\prod_{j=1}^J p(b_j \mid \sigma_b^2)\right\}
+p(\sigma_b^2),
+$$
+
+여기서 $\mathbf{b} = (b_1,\dots,b_J)^\top$ 이다.
+
+명시적으로 쓰면
+
+$$
+p(\cdot \mid \mathbf{y},\mathbf{x})
+\propto
+\exp\!\left(
+\sum_{i=1}^N
+\{y_i \eta_i - \log(1+\exp(\eta_i))\}
+\right)
+\cdot
+\exp\!\left(-\frac{\beta_0^2}{2\cdot10^2}\right)
+\exp\!\left(-\frac{\beta_1^2}{2\cdot10^2}\right)
+$$
+
+$$
+\cdot
+\exp\!\left(
+-\frac{1}{2\sigma_b^2} \sum_{j=1}^J b_j^2
+\right)
+\cdot
+(\sigma_b^2)^{-(a_0+1)}
+\exp\!\left(-\frac{b_0}{\sigma_b^2}\right).
+$$
+
+------------------------------------------------------------------------
+
+## Stan (NUTS)
+
+Stan에서는 위 사후분포를 그대로 타깃으로 삼아\
+Hamiltonian Monte Carlo + NUTS로 시뮬레이션한다.
+
+-   파라미터: $\beta_0, \beta_1, \sigma_b^2, b_1,\dots,b_J$
+-   타깃 밀도: 위 joint posterior
+-   제안분포: Stan 내부에서 자동으로 구성되는 HMC proposal\
+    (mass matrix와 step size를 warmup 단계에서 튜닝)
+
+Stan 쪽에서는 수식으로 제안분포를 따로 쓰지 않고,\
+“사후분포의 log-density와 gradient를 이용한 HMC 제안”으로 이해하면 된다.
+
+------------------------------------------------------------------------
+
+## Metropolis–Hastings (MH) 설정
+
+### 파라미터 블록
+
+MH에서는
+
+-   첫 번째 블록: $\theta = (\beta_0,\beta_1,\mathbf{b}) \in \mathbb{R}^{2+J}$\
+-   두 번째 블록: $\sigma_b^2$
+
+로 나누어,
+
+-   $(\beta_0,\beta_1,\mathbf{b})$ 는 random-walk MH\
+-   $\sigma_b^2$ 는 full conditional Gibbs
+
+로 업데이트한다.
+
+### 1) $(\beta_0,\beta_1,\mathbf{b})$ 에 대한 제안분포
+
+현재 값이 $\theta^{(t)}$ 일 때 제안값은
+
+$$
+\theta^\* \mid \theta^{(t)}
+\sim
+N\!\big(
+\theta^{(t)}, \ \Sigma_{\text{prop}}
+\big),
+$$
+
+여기서
+
+$$
+\Sigma_{\text{prop}}
+=
+\text{diag}\big(
+\tau_\beta^2,\ \tau_\beta^2,\ 
+\tau_b^2,\dots,\tau_b^2
+\big),
+$$
+
+-   고정효과에 대한 제안 표준편차: $\tau_\beta$\
+-   랜덤효과에 대한 제안 표준편차: $\tau_b$
+
+로 설정했다 (예: 코드에서는 $\tau_\beta = 0.25,\ \tau_b = 0.40$).
+
+제안분포가 대칭(normal random-walk)이므로\
+수용확률은
+
+$$
+\alpha
+= \min\Bigg\{
+1,\ 
+\frac{
+p(\theta^\*,\sigma_b^{2,(t)} \mid \mathbf{y},\mathbf{x})
+}{
+p(\theta^{(t)},\sigma_b^{2,(t)} \mid \mathbf{y},\mathbf{x})
+}
+\Bigg\}.
+$$
+
+$U \sim \text{Uniform}(0,1)$ 에 대해 $U < \alpha$ 이면 제안을 수용한다.
+
+### 2) $\sigma_b^2$ 의 full conditional (Gibbs)
+
+사후분포에서 $\sigma_b^2$와 관련된 부분만 모으면
+
+$$
+p(\sigma_b^2 \mid \mathbf{b},\text{나머지})
+\propto
+(\sigma_b^2)^{-(a_0+1)}
+\exp\!\left(-\frac{b_0}{\sigma_b^2}\right)
+\cdot
+(\sigma_b^2)^{-J/2}
+\exp\!\left(
+-\frac{1}{2\sigma_b^2}\sum_{j=1}^J b_j^2
+\right).
+$$
+
+따라서
+
+$$
+p(\sigma_b^2 \mid \mathbf{b})
+\propto
+(\sigma_b^2)^{-\left(a_0 + \frac{J}{2} + 1\right)}
+\exp\!\left(
+-\frac{1}{\sigma_b^2}
+\left\{
+b_0 + \frac{1}{2}\sum_{j=1}^J b_j^2
+\right\}
+\right),
+$$
+
+즉
+
+$$
+\sigma_b^2 \mid \mathbf{b}
+\sim
+\text{Inv-Gamma}\left(
+a_0 + \frac{J}{2},\ 
+b_0 + \frac{1}{2}\sum_{j=1}^J b_j^2
+\right).
+$$
+
+코드에서는\
+$\sigma_b^2 = 1 / G$ 로 두고 $G \sim \text{Gamma}(\text{shape}, \text{rate})$ 를 뽑는 방식으로 구현했다.
+
+------------------------------------------------------------------------
+
+## Pólya–Gamma (PG) Gibbs Sampler
+
+### PG 보조변수 도입
+
+각 관측 $i$에 대해
+
+-   $\eta_i = \beta_0 + \beta_1 x_i + b_{\text{group}(i)}$,
+-   $\kappa_i = y_i - \tfrac{1}{2}$
+
+라고 두면, 로지스틱 우도는 Pólya–Gamma 분포를 이용해
+
+$$
+\frac{e^{\kappa_i \eta_i}}{1 + e^{\eta_i}}
+=
+\exp(\kappa_i \eta_i)
+\int_0^\infty
+\exp\!\left(-\frac{\omega_i \eta_i^2}{2}\right)
+p(\omega_i)\,d\omega_i,
+$$
+
+여기서 $\omega_i \sim \text{PG}(1,0)$ 이다.
+
+이를 이용해 각 $i$마다 보조변수
+
+$$
+\omega_i \mid \eta_i \sim \text{PG}(1,\eta_i)
+$$
+
+를 도입하면, 조건부로 **정규–선형회귀 형태**가 된다.
+
+### 디자인 행렬 표현
+
+-   고정효과 디자인행렬: $X_\beta$ (크기 $N \times 2$, 열은 1과 $x_i$)\
+-   랜덤효과 디자인행렬: $Z$ (크기 $N \times J$, $i$행의 $\text{group}(i)$ 열만 1, 나머지 0)
+
+전체 디자인행렬을
+
+$$
+X = [X_\beta\; Z]
+$$
+
+로 두고, 파라미터 벡터를
+
+$$
+\theta = 
+\begin{pmatrix}
+\beta_0 \\ \beta_1 \\ b_1 \\ \vdots \\ b_J
+\end{pmatrix}
+\in \mathbb{R}^{2+J}
+$$
+
+라고 쓰자.
+
+또한 $\mathbf{\omega} = (\omega_1,\dots,\omega_N)^\top$,\
+$\Omega = \text{diag}(\omega_1,\dots,\omega_N)$ 라고 두면,\
+PG-보조변수를 도입한 후의 완전조건부 분포는 다음과 같다.
+
+### 1) $\theta \mid \mathbf{\omega},\sigma_b^2,\mathbf{y}$ 의 정규 full conditional
+
+사전분산 행렬을
+
+$$
+V_0 = \text{diag}\big(
+10^2, 10^2, \underbrace{\sigma_b^2,\dots,\sigma_b^2}_{J\text{개}}
+\big),
+\quad
+V_0^{-1} = \text{diag}\big(
+1/10^2, 1/10^2, \underbrace{1/\sigma_b^2,\dots,1/\sigma_b^2}_{J\text{개}}
+\big),
+$$
+
+라고 두면, PG 보조변수 도입 후 $\theta$에 대한 사후조건부는
+
+$$
+\theta \mid \mathbf{\omega},\sigma_b^2,\mathbf{y}
+\sim
+N\big(
+\mu_{\text{post}},\ \Sigma_{\text{post}}
+\big),
+$$
+
+여기서
+
+$$
+\Sigma_{\text{post}}
+=
+\left(
+X^\top \Omega X + V_0^{-1}
+\right)^{-1},
+$$
+
+$$
+\mu_{\text{post}}
+=
+\Sigma_{\text{post}} 
+X^\top (\mathbf{y} - \tfrac{1}{2}\mathbf{1}),
+$$
+
+$\mathbf{1}$은 길이 $N$인 1 벡터이다.
+
+즉 PG-Gibbs에서 한 번의 블록 업데이트로\
+$(\beta_0,\beta_1,b_1,\dots,b_J)$를 **다변량 정규분포에서 한 번에** 샘플링한다.
+
+### 2) $\sigma_b^2 \mid \mathbf{b}$ 의 full conditional
+
+PG 방법에서도 $\sigma_b^2$에 대한 부분은 MH와 동일하므로,
+
+$$
+\sigma_b^2 \mid \mathbf{b}
+\sim
+\text{Inv-Gamma}\left(
+a_0 + \frac{J}{2},\ 
+b_0 + \frac{1}{2}\sum_{j=1}^J b_j^2
+\right).
+$$
+
+### 3) $\omega_i \mid \theta,\mathbf{y}$ 의 full conditional
+
+각 $i$에 대해 독립적으로
+
+$$
+\omega_i \mid \theta,\mathbf{y}
+\sim
+\text{PG}(1,\eta_i), \quad
+\eta_i = x_i^\top \beta + b_{\text{group}(i)},
+$$
+
+이 되며, 이는 `BayesLogit::rpg(1, 1, eta_i)` 같은 함수로 샘플링한다.
+
+### 4) PG-Gibbs 한 사이클 요약
+
+1.  현재 $\theta^{(t)}$ 에 대해 $\eta_i^{(t)} = \beta_0^{(t)} + \beta_1^{(t)} x_i + b_{\text{group}(i)}^{(t)}$ 계산\
+2.  각 $i$에 대해 $\omega_i^{(t+1)} \sim \text{PG}(1,\eta_i^{(t)})$\
+3.  $\mathbf{\omega}^{(t+1)}$ 를 이용해\
+    $\Sigma_{\text{post}}, \mu_{\text{post}}$ 계산 후\
+    $\theta^{(t+1)} \sim N(\mu_{\text{post}}, \Sigma_{\text{post}})$\
+4.  새 $\mathbf{b}^{(t+1)}$ 로부터\
+    $\sigma_b^{2,(t+1)} \sim \text{Inv-Gamma}\!\left(a_0 + \tfrac{J}{2}, b_0 + \tfrac{1}{2}\sum_j b_j^{2,(t+1)}\right)$
+
+이 과정을 반복하여 사후분포에서 샘플을 얻는다.
+
+# Model and Notation (toenail 데이터)
+
+### 데이터 구조
+
+-   관측치 인덱스: $i = 1,\dots,N$
+-   환자(군집) 인덱스: $j = 1,\dots,J$
+
+R 코드에서
+
+-   `y  <- toenail_bin$y`\
+-   `X  <- model.matrix(~ treatment * visit, toenail_bin)`\
+-   `Z  <- model.matrix(~ 0 + patientID, toenail_bin)`
+
+로 정의했으므로,
+
+-   $y_i \in \{0,1\}$: $i$번째 관측의 반응변수
+    -   $y_i = 1$: outcome = "moderate or severe"\
+    -   $y_i = 0$: 그 외
+-   $X$는 크기 $N \times p$ 의 고정효과 디자인 행렬
+    -   $X_i^\top$ = $i$번째 행 = $(1,\ \text{treatment}_i,\ \text{visit}_i,\ \text{treatment}_i \times \text{visit}_i,\dots)$
+-   $Z$는 크기 $N \times J$ 의 랜덤효과 디자인 행렬 (환자별 랜덤절편)
+    -   $Z_{ij} = 1$ 이면 관측 $i$는 환자 $j$에 속함, 아니면 0
+-   환자 인덱스 함수: $\text{patient}(i) \in \{1,\dots,J\}$
+    -   $Z_{i,\text{patient}(i)} = 1$ 이고 나머지는 0
+
+고정효과 계수벡터와 랜덤효과는
+
+-   $\beta = (\beta_1,\dots,\beta_p)^\top \in \mathbb{R}^p$
+-   $\mathbf{b} = (b_1,\dots,b_J)^\top \in \mathbb{R}^J$
+
+로 둔다.
+
+------------------------------------------------------------------------
+
+## GLMM 모형 (toenail)
+
+toenail 데이터에 대해서는 **환자별 랜덤절편을 가진 로지스틱 회귀모형**을 사용한다.
+
+$$
+Y_i \mid p_i \sim \text{Bernoulli}(p_i),
+$$
+
+$$
+\text{logit}(p_i)
+= \log\frac{p_i}{1-p_i}
+= X_i^\top \beta + b_{\text{patient}(i)},
+\quad i=1,\dots,N,
+$$
+
+$$
+b_j \mid \sigma_b^2 \sim N(0,\sigma_b^2),
+\quad j=1,\dots,J.
+$$
+
+여기서 $X_i^\top$는 $X$의 $i$번째 행, 즉 treatment, visit, 상호작용을 포함한 고정효과 디자인 벡터이다.
+
+------------------------------------------------------------------------
+
+## Likelihood
+
+전체 관측에 대한 가능도는
+
+$$
+L(\beta,\mathbf{b} \mid \mathbf{y})
+=
+\prod_{i=1}^N
+\Pr(Y_i = y_i \mid \beta,\mathbf{b})
+=
+\prod_{i=1}^N
+p_i^{y_i}(1-p_i)^{1-y_i},
+$$
+
+여기서
+
+$$
+p_i
+=
+\frac{\exp(X_i^\top \beta + b_{\text{patient}(i)})}{
+1 + \exp(X_i^\top \beta + b_{\text{patient}(i)})}.
+$$
+
+로그 가능도는
+
+$$
+\ell(\beta,\mathbf{b} \mid \mathbf{y})
+=
+\sum_{i=1}^N
+\left\{
+y_i (X_i^\top \beta + b_{\text{patient}(i)})
+-
+\log\big(1 + \exp(X_i^\top \beta + b_{\text{patient}(i)})\big)
+\right\}.
+$$
+
+------------------------------------------------------------------------
+
+## Priors (toenail 분석에서 사용한 사전분포)
+
+고정효과 계수에 대해 독립 정규 사전분포:
+
+$$
+\beta_k \sim N(0,10^2), \quad k=1,\dots,p.
+$$
+
+랜덤효과 분산에 대해 Inverse-Gamma 사전분포:
+
+$$
+\sigma_b^2 \sim \text{Inv-Gamma}(a_0,b_0),
+$$
+
+즉 밀도는
+
+$$
+p(\sigma_b^2)
+\propto
+(\sigma_b^2)^{-(a_0+1)}
+\exp\!\left(-\frac{b_0}{\sigma_b^2}\right),
+\quad \sigma_b^2>0.
+$$
+
+환자별 랜덤효과는
+
+$$
+b_j \mid \sigma_b^2
+\sim N(0,\sigma_b^2),
+\quad j=1,\dots,J,
+$$
+
+로 서로 독립이라고 가정한다.
+
+------------------------------------------------------------------------
+
+## Joint Posterior (toenail)
+
+파라미터 전체를 $\theta = (\beta,\mathbf{b},\sigma_b^2)$ 라고 하면,\
+사후분포는 (정규화상수 생략)
+
+$$
+p(\beta,\mathbf{b},\sigma_b^2 \mid \mathbf{y},X,Z)
+\propto
+L(\beta,\mathbf{b} \mid \mathbf{y})
+\,
+p(\beta)\,
+p(\mathbf{b} \mid \sigma_b^2)\,
+p(\sigma_b^2).
+$$
+
+명시적으로 쓰면
+
+$$
+p(\beta,\mathbf{b},\sigma_b^2 \mid \mathbf{y},X,Z)
+\propto
+\exp\!\left(
+\sum_{i=1}^N
+\left\{
+y_i (X_i^\top \beta + b_{\text{patient}(i)})
+-
+\log\big(1 + \exp(X_i^\top \beta + b_{\text{patient}(i)})\big)
+\right\}
+\right)
+$$
+
+$$
+\cdot
+\exp\!\left(
+-\frac{1}{2 \cdot 10^2} \sum_{k=1}^p \beta_k^2
+\right)
+\cdot
+\exp\!\left(
+-\frac{1}{2\sigma_b^2} \sum_{j=1}^J b_j^2
+\right)
+\cdot
+(\sigma_b^2)^{-(a_0+1)}
+\exp\!\left(-\frac{b_0}{\sigma_b^2}\right).
+$$
+
+------------------------------------------------------------------------
+
+## Stan 설정 (toenail)
+
+Stan에서는 위 사후분포를 타깃으로 HMC+NUTS를 사용한다.
+
+-   데이터:
+    -   $N$: 전체 관측 수
+    -   $p$: 고정효과 차원 (`ncol(X)`)
+    -   $J$: 환자 수 (`ncol(Z)`)
+    -   `patient[i]`: 관측 $i$의 환자 인덱스 (1,…,J)
+    -   $X$: $N \times p$ 행렬
+    -   $y$: 길이 $N$ 벡터
+-   파라미터:
+    -   $\beta \in \mathbb{R}^p$
+    -   $\sigma_b^2 > 0$
+    -   $\mathbf{b} \in \mathbb{R}^J$
+
+Stan 모형의 핵심은
+
+$$
+\beta \sim N(0,10^2 I_p),
+\quad
+\sigma_b^2 \sim \text{Inv-Gamma}(a_0,b_0),
+\quad
+\mathbf{b} \sim N(0,\sigma_b^2 I_J),
+$$
+
+$$
+y_i \mid \beta,\mathbf{b}
+\sim
+\text{Bernoulli}\big(
+\text{logit}^{-1}(X_i^\top \beta + b_{\text{patient}(i)})
+\big),
+\quad i=1,\dots,N.
+$$
+
+Stan 내부에서는 이 joint posterior의 log-density와 gradient를 이용해\
+NUTS 제안을 자동으로 구성한다.
+
+------------------------------------------------------------------------
+
+## Metropolis–Hastings (MH) 설정 (toenail)
+
+MH에서는 파라미터를 두 블록으로 나누었다.
+
+1.  블록 1: $\theta = (\beta,\mathbf{b}) \in \mathbb{R}^{p+J}$
+    -   random-walk MH
+2.  블록 2: $\sigma_b^2$
+    -   full conditional Gibbs
+
+### 1) $(\beta,\mathbf{b})$ 에 대한 제안분포
+
+현재 상태를 $\theta^{(t)} = (\beta^{(t)},\mathbf{b}^{(t)})$ 라 하면,\
+제안값은
+
+$$
+\theta^\* \mid \theta^{(t)}
+\sim
+N\!\big(\theta^{(t)},\ \Sigma_{\text{prop}}\big),
+$$
+
+$$
+\Sigma_{\text{prop}}
+=
+\text{diag}\big(
+\tau_\beta^2,\dots,\tau_\beta^2,
+\tau_b^2,\dots,\tau_b^2
+\big),
+$$
+
+-   처음 $p$개 대각 원소: $\tau_\beta^2$ (고정효과 제안 분산)\
+-   나머지 $J$개 대각 원소: $\tau_b^2$ (랜덤효과 제안 분산)
+
+코드에서는 예를 들어
+
+-   $\tau_\beta = 0.25$
+-   $\tau_b = 0.40$
+
+으로 설정하였다.
+
+가능도와 사전분포를 곱한 joint posterior를 $p(\beta,\mathbf{b},\sigma_b^2 \mid \mathbf{y})$ 라면,\
+제안분포가 대칭이므로 수용확률은
+
+$$
+\alpha
+=
+\min\left\{
+1,\
+\frac{
+p(\beta^\*,\mathbf{b}^\*,\sigma_b^{2,(t)} \mid \mathbf{y})
+}{
+p(\beta^{(t)},\mathbf{b}^{(t)},\sigma_b^{2,(t)} \mid \mathbf{y})
+}
+\right\}.
+$$
+
+$U \sim \text{Uniform}(0,1)$ 을 뽑아서 $U < \alpha$ 이면 제안을 수용한다.
+
+### 2) $\sigma_b^2$ 의 full conditional (Gibbs)
+
+$\sigma_b^2$ 와 $\mathbf{b}$에 관련된 항만 모으면
+
+$$
+p(\sigma_b^2 \mid \mathbf{b})
+\propto
+(\sigma_b^2)^{-(a_0+1)}
+\exp\!\left(-\frac{b_0}{\sigma_b^2}\right)
+\cdot
+(\sigma_b^2)^{-J/2}
+\exp\!\left(-\frac{1}{2\sigma_b^2}\sum_{j=1}^J b_j^2\right).
+$$
+
+따라서
+
+$$
+p(\sigma_b^2 \mid \mathbf{b})
+\propto
+(\sigma_b^2)^{-\left(a_0 + \frac{J}{2} + 1\right)}
+\exp\!\left(
+-\frac{1}{\sigma_b^2}
+\left\{
+b_0 + \frac{1}{2}\sum_{j=1}^J b_j^2
+\right\}
+\right),
+$$
+
+즉
+
+$$
+\sigma_b^2 \mid \mathbf{b}
+\sim
+\text{Inv-Gamma}\left(
+a_0 + \frac{J}{2},\
+b_0 + \frac{1}{2}\sum_{j=1}^J b_j^2
+\right).
+$$
+
+코드에서는 $\sigma_b^2 = 1 / G$ 로 두고\
+$G \sim \text{Gamma}(\text{shape},\text{rate})$에서 샘플링하는 방식으로 구현하였다.
+
+------------------------------------------------------------------------
+
+## Pólya–Gamma (PG) Gibbs (toenail)
+
+### 디자인 행렬과 파라미터 벡터
+
+toenail 데이터에서는
+
+-   고정효과: $X$ ($N \times p$)\
+-   랜덤효과: $Z$ ($N \times J$)
+
+를 사용하여 전체 디자인 행렬을
+
+$$
+X_{\text{full}} = [X\ Z]
+$$
+
+라고 두고,
+
+$$
+\theta =
+\begin{pmatrix}
+\beta \\ \mathbf{b}
+\end{pmatrix}
+\in
+\mathbb{R}^{p+J}
+$$
+
+로 묶는다.
+
+각 $i$에 대해
+
+-   $\eta_i = X_i^\top \beta + Z_i^\top \mathbf{b} = X_{\text{full},i}^\top \theta$
+-   $\kappa_i = y_i - \tfrac{1}{2}$
+
+라고 두면, PG 보조변수 $\omega_i$를 도입했을 때 complete conditional 구조는 시뮬과 동일하게 된다.
+
+### 1) $\omega_i \mid \theta$ 의 full conditional
+
+각 관측 $i$에 대해
+
+$$
+\omega_i \mid \theta,\mathbf{y}
+\sim
+\text{PG}(1,\eta_i),
+\quad
+\eta_i = X_i^\top \beta + Z_i^\top \mathbf{b},
+$$
+
+로 서로 독립이다.
+
+### 2) $\theta \mid \mathbf{\omega},\sigma_b^2,\mathbf{y}$ 의 정규 full conditional
+
+$\Omega = \text{diag}(\omega_1,\dots,\omega_N)$,\
+$X = X_{\text{full}}$ 라고 간단히 쓰면,
+
+사전분산 행렬은
+
+$$
+V_0
+=
+\text{diag}(
+\underbrace{10^2,\dots,10^2}_{p\ \text{개}},
+\underbrace{\sigma_b^2,\dots,\sigma_b^2}_{J\ \text{개}}
+),
+$$
+
+$$
+V_0^{-1}
+=
+\text{diag}(
+\underbrace{1/10^2,\dots,1/10^2}_{p\ \text{개}},
+\underbrace{1/\sigma_b^2,\dots,1/\sigma_b^2}_{J\ \text{개}}
+).
+$$
+
+그러면 완전조건부는
+
+$$
+\theta \mid \mathbf{\omega},\sigma_b^2,\mathbf{y}
+\sim
+N(
+\mu_{\text{post}},\ \Sigma_{\text{post}}
+),
+$$
+
+$$
+\Sigma_{\text{post}}
+=
+\left(X^\top \Omega X + V_0^{-1}\right)^{-1},
+$$
+
+$$
+\mu_{\text{post}}
+=
+\Sigma_{\text{post}} X^\top (\mathbf{y} - \tfrac{1}{2}\mathbf{1}),
+$$
+
+여기서 $\mathbf{1}$ 은 길이 $N$ 인 1 벡터이다.
+
+즉 toenail 데이터에서도 PG-Gibbs는\
+고정효과 $\beta$와 랜덤효과 $\mathbf{b}$를 하나의 블록으로 묶어서\
+**다변량 정규분포에서 한 번에 샘플링** 한다.
+
+### 3) $\sigma_b^2 \mid \mathbf{b}$ 의 full conditional
+
+$\sigma_b^2$에 대한 부분은 시뮬레이션과 동일하게
+
+$$
+\sigma_b^2 \mid \mathbf{b}
+\sim
+\text{Inv-Gamma}\left(
+a_0 + \frac{J}{2},\
+b_0 + \frac{1}{2}\sum_{j=1}^J b_j^2
+\right).
+$$
+
+### 4) PG-Gibbs 한 사이클 요약 (toenail)
+
+1.  현재 $\theta^{(t)} = (\beta^{(t)},\mathbf{b}^{(t)})$ 에 대해\
+    $\eta_i^{(t)} = X_{\text{full},i}^\top \theta^{(t)}$ 를 계산
+2.  각 $i$에 대해\
+    $\omega_i^{(t+1)} \sim \text{PG}(1,\eta_i^{(t)})$
+3.  $\mathbf{\omega}^{(t+1)}$ 를 이용해\
+    $\Sigma_{\text{post}}, \mu_{\text{post}}$ 를 계산하고\
+    $\theta^{(t+1)} \sim N(\mu_{\text{post}},\Sigma_{\text{post}})$
+4.  새 $\mathbf{b}^{(t+1)}$ 에 대해\
+    $\sigma_b^{2,(t+1)} \sim \text{Inv-Gamma}\!\left(
+       a_0 + \tfrac{J}{2},
+       b_0 + \tfrac{1}{2} \sum_{j=1}^J b_j^{2,(t+1)}
+    \right)$
+
+이 과정을 반복하여 toenail 데이터에 대한\
+베이지안 GLMM 사후분포를 PG-Gibbs로 샘플링한다.

@@ -1,0 +1,541 @@
+---
+title: "Polya-Gamma latent variables"
+format:
+  html:
+    html-math-method: katex   # 수식 렌더링용 (MathJax도 가능)
+date: "2025-09-23"
+categories: [LMM, code, Bayesian]
+theorems:
+  numbering: by-section
+number-sections: true
+#image: "image.jpg"
+---
+
+```{r}
+library(BayesLogit)
+```
+
+**이번 페이지는 `Pólya-Gamma`분포를 이해해보고 논문의 예시를 돌려보고 파악해본다.**
+
+## 서론: 로지스틱 회귀와 계산 문제 {#sec-intro}
+
+관측 $i=1,\dots,n$에 대해
+
+$$\eta_i \;=\; x_i^\top \beta,\qquad 
+\text{logit}(p_i)=\eta_i$$
+ {#eq-linpred}
+
+$$y_i \mid p_i \sim \mathrm{Bin}(n_i,\,p_i), 
+\qquad p_i=\frac{e^{\eta_i}}{1+e^{\eta_i}}.$$
+
+이때 (랜덤효과가 없으므로) 주변가능도는 단순히 **우도**가 되며, 다음과 같다.
+
+$$L(\beta)
+=\prod_{i=1}^n 
+\frac{\big(e^{x_i^\top\beta}\big)^{y_i}}{\big(1+e^{x_i^\top\beta}\big)^{\,n_i}}.$$
+ {#eq-marglik}
+
+이 모델에서는 $\beta$의 닫힌형 MLE가 없기 때문에, 보통 IRLS/뉴턴–랩슨으로 최대우도를 구한다. 이후 절에서는 이 우도를 **Pólya–Gamma(PG) 증강**으로 재표현하여, 베이지안 관점에서 $\beta$의 사후분포를 간단한 깁스 샘플링으로 계산하는 방법을 보인다.
+
+고정효과만 있는 로지스틱 회귀에서도 $\beta$의 닫힌형 MLE는 존재하지 않아 IRLS/뉴턴–랩슨으로 추정하며, GLMM에서는 @eq-marglik 의 고차원 적분 때문에 계산이 더욱 어렵다.
+
+## 베이지안 접근과 Pólya–Gamma 증강 {#sec-pg}
+
+로지스틱 링크는 conjugate prior가 아니므로 $p(\beta,b,\Sigma\mid y)$ 사후분포를 직접 다루기 어렵다. 흔히 Metropolis–Hastings(MH)를 사용하나, 고차원에선 제안분포 설계/혼합/연산비용 문제가 커진다. 핵심 아이디어는 *데이터 증강*으로 조건부를 정규꼴로 만드는 것이다. 이를 위해 **Pólya–Gamma(PG)** 잠재변수를 도입한다.
+
+::: {#def:pg .callout-note}
+## Definition 1
+
+**Pólya-Gamma distribution.**\
+A random variable $X$ has a Pólya–Gamma distribution with parameters $b>0$ and $c \in \mathcal{R}$, denoted $X \sim \operatorname{PG}(b, c)$, if
+
+$$X \stackrel{D}{=} \frac{1}{2 \pi^2} \sum_{k=1}^{\infty} \frac{g_k}{(k-1 / 2)^2+c^2 /\left(4 \pi^2\right)}$$
+
+where the $g_k \sim \mathrm{Ga}(b, 1)$ are independent gamma random variables, and where $\stackrel{D}{=}$ indicates equality in distribution.
+:::
+
+표기를 $\psi_i:=\eta_i=x_i^\top\beta+z_i^\top b$, $\kappa\_i:=y_i-\tfrac{n_i}{2}$로 두면, 다음의 **정확한 적분 정체식**이 성립한다:
+
+$$\frac{(e^{\psi_i})^{y_i}}{(1+e^{\psi_i})^{\,n_i}}
+\;=\; 2^{-n_i}\, e^{\kappa_i \psi_i}\;
+\mathbb{E}_{\omega_i\sim PG(n_i,0)}
+\!\left[\exp\!\left(-\frac{\omega_i \psi_i^2}{2}\right)\right].$$
+ {#eq-pg-identity}
+
+이에 따라 관측별 잠재변수 $\omega_i\sim PG(n_i,\psi_i)$를 도입하면 (완전자료 기준)
+
+$$p(y,\omega \mid \beta,b)
+\;\propto\;
+\exp\!\left(
+  -\frac{1}{2}\sum_{i=1}^n \omega_i\,\psi_i^2
+  + \sum_{i=1}^n \kappa_i\,\psi_i
+\right),$$
+ {#eq-complete-lik}
+
+으로 정리되어 $(\beta,b)$에 대한 **정규 커널**이 나타난다.
+
+### 설명
+
+다음부터는 3.1절 표기에 맞춘다. 각 관측 $i=1,\dots,N$에 대해 성공 횟수 $y_i$, 시행 수 $n_i$, 회귀자 $x_i=(x_{i1},\dots,x_{ip})^\top$, 그리고
+$$\psi_i := x_i^\top \beta$$
+로 둔다. 사전은 $\beta \sim \mathcal N(b,B)$ 이다. Pólya–Gamma 방법으로 사후에서 표본을 얻으려면 아래 **두 단계**를 반복한다:
+
+$$\omega_i \mid \beta \;\sim\; PG\!\big(n_i,\ x_i^\top \beta\big),$$
+ {#eq-omega-cc}
+
+$$\beta \mid y,\omega \;\sim\; \mathcal N\!\big(m_\omega,\ V_\omega\big),$$
+ {#eq-betab-cc}
+
+여기서 $\Omega:=\mathrm{diag}(\omega_1,\dots,\omega_N)$, $\kappa:=(\kappa_1,\dots,\kappa_N)^\top$ with $\kappa_i := y_i-\tfrac{n_i}{2}$ 이며,
+
+$$V_\omega \;=\; \big(X^\top \Omega X + B^{-1}\big)^{-1},$$
+ {#eq-Vomega}
+
+$$m_\omega \;=\; V_\omega\,\big(X^\top \kappa + B^{-1} b\big).$$
+ {#eq-momega}
+
+------------------------------------------------------------------------
+
+#### (유도 스케치)
+
+사후분포의 $\beta$ 조건부분포는
+$$p(\beta \mid \omega,y)
+\;\propto\;
+p(\beta)\,\prod_{i=1}^N \exp\!\Big\{\kappa_i\,x_i^\top\beta - \omega_i\,(x_i^\top\beta)^2/2\Big\}$$
+이고, $\;z:=(\kappa_1/\omega_1,\dots,\kappa_N/\omega_N)^\top$ 라 두면
+
+$$\begin{aligned}
+p(\boldsymbol{\beta} \mid \omega, y) \propto p(\boldsymbol{\beta}) \prod_{i=1}^N L_i\left(\boldsymbol{\beta} \mid \omega_i\right) & =p(\boldsymbol{\beta}) \prod_{i=1}^N \exp \left\{\kappa_i x_i^T \boldsymbol{\beta}-\omega_i\left(x_i^T \boldsymbol{\beta}\right)^2 / 2\right\} \\
+& \propto p(\boldsymbol{\beta}) \prod_{i=1}^N \exp \left\{\frac{\omega_i}{2}\left(x_i^T \boldsymbol{\beta}-\kappa_i / \omega_i\right)^2\right\} \\
+& \propto p(\boldsymbol{\beta}) \exp \left\{-\frac{1}{2}(z-X \boldsymbol{\beta})^T \Omega(z-X \boldsymbol{\beta})\right\}
+\end{aligned}$$
+
+즉, 작업반응(working response) $z$, 설계행렬 $X$, 공분산 $\Omega^{-1}$을 갖는 **조건부 가우시안 우도**가 되어, 사전분포 $\beta\sim\mathcal N(b,B)$와 결합하면 위의 $\mathcal N(m_\omega,V_\omega)$가 된다.
+
+## 실습
+
+PG분포를 사용한 깁스 샘플링 방법과 일반적인 MH 알고리즘을 사용하여 비교해봤다.
+
+성능의 지표로써 논문에 나온 값을 사용 ESS(Effective Sample Size, 유효표본크기)
+
+$$\mathrm{ESS}=\frac{N}{1+2 \sum_{k=1}^{\infty} \rho_k}$$
+
+### 고정효과 로지스틱 (fixed-effects)
+
+- $y_i \sim \operatorname{Bin}\left(n_i, p_i\right), \psi_i=x_i^{\top} \beta, \operatorname{logit}\left(p_i\right)=\psi_i$.
+- 사전 $\beta \sim \mathcal{N}(b, B)$.
+- 사후 로그밀도
+
+$$\log p(\beta \mid y)=\sum_i\left\{y_i x_i^{\top} \beta-n_i \log \left(1+e^{x_i^{\top} \beta}\right)\right\}-\frac{1}{2}(\beta-b)^{\top} B^{-1}(\beta-b)+\text { const. }$$
+
+- PG-깁스:
+
+$$\begin{aligned}
+& \omega_i \mid \beta \sim P G\left(n_i, x_i^{\top} \beta\right), \\
+& \beta \mid \omega, y \sim \mathcal{N}\left(m_\omega, V_\omega\right) \text { with } \\
+& V_\omega=\left(X^{\top} \Omega X+B^{-1}\right)^{-1}, m_\omega=V_\omega\left(X^{\top} \kappa+B^{-1} b\right), \kappa_i=y_i-n_i / 2 .
+\end{aligned}$$
+
+```{r}
+library(BayesLogit)
+library(coda)
+
+set.seed(123)
+
+# ===== Data (fixed effects) =====
+N  <- 2000
+p  <- 5
+X  <- cbind(1, matrix(rnorm((p-1)*N), N, p-1))
+beta_true <- c(-0.5, 0.8, -0.6, 0.7, 0.0)
+eta <- as.vector(X %*% beta_true)
+prob <- 1/(1+exp(-eta))
+n_i <- rep(1, N)
+y   <- rbinom(N, n_i, prob)
+
+# Prior beta ~ N(b,B)
+b    <- rep(0, p)
+B    <- diag(100, p)
+Binv <- solve(B)
+kappa <- y - n_i/2
+
+rmvnorm_chol <- function(mu, Sigma){
+  L <- chol(Sigma); drop(mu + t(L) %*% rnorm(length(mu)))
+}
+
+# ---------- PG–Gibbs ----------
+pg_gibbs <- function(S=6000, burn=1000){
+  beta <- rep(0, p)
+  keep <- matrix(NA, nrow=S-burn, ncol=p)
+  t0 <- proc.time()
+  for(s in 1:S){
+    psi <- as.vector(X %*% beta)
+    omega <- rpg(N, h=n_i, z=psi)
+    V <- solve(t(X) %*% (omega * X) + Binv)
+    m <- V %*% (t(X) %*% kappa + Binv %*% b)
+    beta <- rmvnorm_chol(m, V)
+    if(s>burn) keep[s-burn,] <- beta
+  }
+  time <- (proc.time()-t0)[["elapsed"]]
+  list(draws=keep, time=time, acc=1.0) # 깁스는 acc=1
+}
+
+# ---------- Random-Walk Metropolis (block on beta) ----------
+# Adaptive scaling during burn-in to target ~0.25 acceptance
+rwmh_beta <- function(S=6000, burn=1000, scale_init=0.5){
+  logpost <- function(beta){
+    xb <- as.vector(X %*% beta)
+    sum(y*xb - n_i*log1p(exp(xb))) - 0.5 * t(beta-b) %*% Binv %*% (beta-b)
+  }
+  # Proposal covariance: scaled (X'X)^(-1) as rough curvature
+  prop_base <- tryCatch(solve(t(X)%*%X), error=function(e) diag(1,p))
+  beta <- rep(0, p)
+  lp   <- logpost(beta)
+  keep <- matrix(NA, nrow=S-burn, ncol=p)
+  acc <- 0; scale <- scale_init
+  t0 <- proc.time()
+  for(s in 1:S){
+    # adapt scale every 100 iters during burn-in
+    if(s <= burn && s %% 100 == 0){
+      rate <- acc / 100
+      scale <- scale * ifelse(rate < 0.2, 0.7, ifelse(rate > 0.35, 1.3, 1.0))
+      acc <- 0
+    }
+    prop <- rmvnorm_chol(rep(0,p), scale^2 * prop_base)
+    beta_new <- beta + prop
+    lp_new <- logpost(beta_new)
+    if(log(runif(1)) < (lp_new - lp)){
+      beta <- beta_new; lp <- lp_new
+      if(s <= burn) acc <- acc + 1
+    }
+    if(s>burn) keep[s-burn,] <- beta
+  }
+  time <- (proc.time()-t0)[["elapsed"]]
+  # Final acceptance over the last 100 adaptations during burn-in is already tracked in acc,
+  # but report full-chain (post-burn) acceptance too:
+  acc_full <- mean(apply(diff(keep, lag=1), 1, function(d) any(d!=0)))
+  list(draws=keep, time=time, acc=acc_full, scale=scale)
+}
+
+# ----- Run & Compare -----
+S <- 8000; burn <- 2000
+
+res_pg  <- pg_gibbs(S, burn)
+res_mh  <- rwmh_beta(S, burn)
+
+summ <- function(res, name){
+  m <- colMeans(res$draws)
+  ci <- t(apply(res$draws, 2, quantile, c(0.025,0.975)))
+  ess <- effectiveSize(as.mcmc(res$draws))
+  ess_sec <- sum(ess) / res$time
+  cat("\n=== ", name, " ===\n", sep="")
+  cat("시간(초): ", round(res$time,2), 
+      " | 총 ESS: ", round(sum(ess),1),
+      " | ESS/sec: ", round(ess_sec,1),
+      " | 수용률: ", ifelse(is.null(res$acc),"--", round(res$acc,3)), "\n", sep="")
+  cat("사후평균:\n"); print(round(m,3))
+  cat("95% 신용구간:\n"); print(round(ci,3))
+  invisible(list(mean=m, ci=ci, ess=ess, ess_sec=ess_sec))
+}
+
+out_pg <- summ(res_pg, "PG–Gibbs")
+out_mh <- summ(res_mh, "RWMH (block)")
+
+cat("\n True beta:\n"); print(round(beta_true,3))
+```
+
+### 랜덤 절편이 들어간 GLMM: PG–Gibbs vs Metropolis-within-Gibbs
+
+- $\psi_i=\alpha_{g(i)}+x_i^{\top} \beta$.
+- 사후 로그밀도( $\beta$-블록, $\alpha$-스캍라)는 고정효과 경우와 유사하되 $\psi$ 에 $\alpha$ 가 포함됨.
+- PG-깁스는 앞서 제시한 닫힌형 4-블록.
+- MWG-MH:
+- $\beta \mid \alpha$ : RWMH (다변량 정규 제안)
+- a_j\|ß: RWMH (스칼라 정규 제안)
+- $\sigma^2 \mid a$ : Inverse-Gamma
+
+```{r}
+library(BayesLogit)
+library(coda)
+set.seed(321)
+
+# ===== Data (random intercept) =====
+J <- 30                        # 데모: 너무 크게 잡지 마세요 (MH가 매우 느림)
+n_j <- sample(20:30, J, TRUE)
+N <- sum(n_j)
+g <- rep(1:J, times=n_j)
+
+p <- 4
+X <- cbind(1, matrix(rnorm((p-1)*N), N, p-1))
+beta_true <- c(0.7, -0.8, 0.6, 0.0)
+sigma_b_true <- 0.7
+alpha_true <- rnorm(J, 0, sigma_b_true)
+
+eta <- alpha_true[g] + as.vector(X %*% beta_true)
+pr  <- 1/(1+exp(-eta))
+n_i <- rep(1,N)
+y   <- rbinom(N, n_i, pr)
+
+# Priors
+b <- rep(0,p)
+B <- diag(100,p); Binv <- solve(B)
+a0 <- 2; b0 <- 2
+kappa <- y - n_i/2
+
+rmvnorm_chol <- function(mu, Sigma){ L <- chol(Sigma); drop(mu + t(L)%*%rnorm(length(mu))) }
+
+# ---------- PG–Gibbs (4-block) ----------
+pg_glmm <- function(S=6000, burn=2000){
+  beta <- rep(0,p); alpha <- rnorm(J,0,1); sig2 <- 1
+  keep_b <- matrix(NA,S-burn,p); keep_s <- numeric(S-burn)
+  t0 <- proc.time()
+  for(s in 1:S){
+    psi <- alpha[g] + as.vector(X %*% beta)
+    omega <- rpg(N, h=n_i, z=psi)
+
+    # beta | .
+    Vb <- solve(t(X)%*%(omega*X) + Binv)
+    mb <- Vb %*% (t(X)%*%(kappa - omega*alpha[g]) + Binv%*%b)
+    beta <- rmvnorm_chol(mb, Vb)
+
+    # alpha_j | .
+    for(j in 1:J){
+      idx <- which(g==j)
+      Vaj <- 1 / (sum(omega[idx]) + 1/sig2)
+      maj <- Vaj * sum(kappa[idx] - omega[idx] * as.vector(X[idx,] %*% beta))
+      alpha[j] <- rnorm(1, maj, sqrt(Vaj))
+    }
+
+    # sig2 | .
+    sig2 <- 1 / rgamma(1, shape=a0+J/2, rate=b0 + sum(alpha^2)/2)
+
+    if(s>burn){k<-s-burn; keep_b[k,]<-beta; keep_s[k]<-sig2}
+  }
+  time <- (proc.time()-t0)[["elapsed"]]
+  list(draws=keep_b, sig2=keep_s, time=time, acc=list(beta=1, alpha=1))
+}
+
+# ---------- Metropolis-within-Gibbs ----------
+mwg_glmm <- function(S=6000, burn=2000, scale_b=0.3, scale_a=0.5){
+  # log posterior (up to const) for beta given alpha, sig2
+  logpost_beta <- function(beta, alpha){
+    xb <- as.vector(X %*% beta)
+    psi <- alpha[g] + xb
+    sum(y*psi - n_i*log1p(exp(psi))) - 0.5 * t(beta-b) %*% Binv %*% (beta-b)
+  }
+  # log posterior for alpha_j given beta, sig2
+  logpost_alpha_j <- function(a_j, j, beta, alpha, sig2){
+    alpha[j] <- a_j
+    psi <- alpha[g] + as.vector(X %*% beta)
+    idx <- which(g==j)
+    sum(y[idx]*psi[idx] - n_i[idx]*log1p(exp(psi[idx]))) - 0.5 * a_j^2 / sig2
+  }
+
+  beta <- rep(0,p); alpha <- rnorm(J,0,1); sig2 <- 1
+  keep_b <- matrix(NA,S-burn,p); keep_s <- numeric(S-burn)
+  acc_b <- 0; acc_a <- rep(0,J)
+
+  prop_base_b <- tryCatch(solve(t(X)%*%X), error=function(e) diag(1,p))
+
+  t0 <- proc.time()
+  for(s in 1:S){
+    # -- beta (block RWMH)
+    lp0 <- logpost_beta(beta, alpha)
+    beta_prop <- beta + rmvnorm_chol(rep(0,p), scale_b^2 * prop_base_b)
+    lp1 <- logpost_beta(beta_prop, alpha)
+    if(log(runif(1)) < (lp1-lp0)){ beta <- beta_prop; lp0 <- lp1; if(s>burn) acc_b <- acc_b+1 }
+
+    # -- alpha_j (scalar RWMH, each group)
+    for(j in 1:J){
+      lp0j <- logpost_alpha_j(alpha[j], j, beta, alpha, sig2)
+      a_prop <- alpha[j] + rnorm(1, 0, scale_a)
+      lp1j <- logpost_alpha_j(a_prop, j, beta, alpha, sig2)
+      if(log(runif(1)) < (lp1j - lp0j)){ alpha[j] <- a_prop; if(s>burn) acc_a[j] <- acc_a[j]+1 }
+    }
+
+    # -- sigma^2 (IG)
+    sig2 <- 1 / rgamma(1, shape=a0+J/2, rate=b0 + sum(alpha^2)/2)
+
+    if(s>burn){k<-s-burn; keep_b[k,]<-beta; keep_s[k]<-sig2}
+  }
+  time <- (proc.time()-t0)[["elapsed"]]
+  list(draws=keep_b, sig2=keep_s, time=time,
+       acc=list(beta=acc_b/(S-burn), alpha=acc_a/(S-burn)))
+}
+
+# ----- Run & Compare -----
+S <- 7000; burn <- 3000
+res_pg  <- pg_glmm(S, burn)
+res_mwg <- mwg_glmm(S, burn, scale_b=0.25, scale_a=0.35)
+
+summ_glmm <- function(res, name){
+  m  <- colMeans(res$draws)
+  ci <- t(apply(res$draws, 2, quantile, c(0.025,0.975)))
+  ess <- effectiveSize(as.mcmc(res$draws))
+  ess_sec <- sum(ess) / res$time
+  cat("\n=== ", name, " ===\n", sep="")
+  cat("시간(초): ", round(res$time,2),
+      " | 총 ESS: ", round(sum(ess),1),
+      " | ESS/sec: ", round(ess_sec,1), "\n", sep="")
+  if(!is.null(res$acc$beta)){
+    cat("수용률 beta: ", round(res$acc$beta,3),
+        " | alpha(평균): ", round(mean(res$acc$alpha),3), "\n", sep="")
+  }
+  cat("사후평균(beta):\n"); print(round(m,3))
+  cat("95% 신용구간(beta):\n"); print(round(ci,3))
+  cat("사후평균(sigma_b^2): ", round(mean(res$sig2),3),
+      " | 95% CI: ", paste(round(quantile(res$sig2, c(0.025,0.975)),3), collapse=" , "), "\n", sep="")
+  invisible(list(mean=m, ci=ci, ess=ess, ess_sec=ess_sec))
+}
+
+out_pg  <- summ_glmm(res_pg,  "PG–Gibbs (GLMM)")
+out_mwg <- summ_glmm(res_mwg, "Metropolis-within-Gibbs (GLMM)")
+
+cat("\n Ture beta: \n"); print(round(beta_true,3))
+cat("Ture sigma_b^2: ", sigma_b_true^2, "\n", sep="")
+```
+
+## 실험 셋팅 정리 (PG–깁스 vs. MH/MWG)
+
+### 공통 기호/구조
+
+- 자료: $y_i \sim \mathrm{Bin}(n_i, p_i)$, $\kappa_i := y_i - \tfrac{n_i}{2}$
+- 로짓: $\mathrm{logit}(p_i) = \psi_i$
+- PG 증강: $\omega_i \mid (\cdot) \sim PG(n_i, \psi_i)$, $\Omega = \mathrm{diag}(\omega_1,\dots,\omega_N)$
+- (필요 시) 작업반응: $z_i := \kappa_i / \omega_i$
+
+------------------------------------------------------------------------
+
+### A. 고정효과 로지스틱 (Fixed Effects)
+
+#### A-1) 데이터 생성(시드/크기/진실값)
+
+- 시드: `set.seed(123)`
+- 표본 수: $N=2000$
+- 공변량 차원: $p=5$ (첫 열 절편 포함)\
+  `X <- cbind(1, matrix(rnorm((p-1)*N), N, p-1))`
+- 진실 계수: $\beta_{\text{true}} = (-0.5,\ 0.8,\ -0.6,\ 0.7,\ 0.0)$
+- 선형예측자/확률: $\eta = X\beta_{\text{true}}$, $p = 1/(1+e^{-\eta})$
+- 시행수: $n_i \equiv 1$ (베르누이)\
+  `y <- rbinom(N, size = n_i, prob = p)`
+
+#### A-2) 사전/하이퍼
+
+- $\beta \sim \mathcal N(b, B)$\
+  `b <- rep(0, p)`, `B <- diag(100, p)`, `Binv <- solve(B)`
+
+#### A-3) PG–깁스 설정
+
+- 반복/번인: `S = 8000`, `burn = 2000`
+- 단계
+  1)  $\omega \sim PG(n,\ X\beta)$ — `rpg(N, h = n_i, z = X %*% beta)`\
+  2)  $\beta \sim \mathcal N(m, V)$,\
+      $V = (X^\top \Omega X + B^{-1})^{-1}$,\
+      $m = V (X^\top \kappa + B^{-1} b)$
+- 초기값: $\beta^{(0)} = \mathbf{0}$
+- 수용률: 깁스이므로 $1.00$
+
+#### A-4) RWMH(블록) 설정(비교용)
+
+- 로그사후\
+  $$\log p(\beta \mid y)
+  = \sum_i \big[y_i x_i^\top \beta - n_i \log(1 + e^{x_i^\top \beta})\big]
+    - \tfrac12 (\beta - b)^\top B^{-1} (\beta - b).$$
+- 제안 공분산 **기저**: $(X^\top X)^{-1}$ (실패 시 $I_p$)\
+  `prop_base <- tryCatch(solve(t(X) %*% X), error = function(e) diag(1, p))`
+- 스케일: `scale_init = 0.5` (번인 중 100회마다 수용률 0.20–0.35 목표 적응)
+- 반복/번인: `S = 8000`, `burn = 2000`
+- 초기값: $\beta^{(0)} = \mathbf{0}$
+- 보고 수용률: 번인 이후 체인 전체 채택 비율
+
+#### A-5) 평가/출력
+
+- 사후요약: 평균, 95% 신용구간
+- ESS/ESS/sec: `coda::effectiveSize(as.mcmc(draws))`, 시간은 `proc.time()`\
+  $\mathrm{ESS/sec} = \dfrac{\sum_j \mathrm{ESS}_j}{\text{경과초}}$
+- 빈도주의 비교(참고): `glm(y ~ X[,-1], family = binomial(), weights = n_i)`
+
+------------------------------------------------------------------------
+
+### B. 랜덤 인터셉트 GLMM (Random Intercept)
+
+#### B-1) 데이터 생성(시드/크기/진실값)
+
+- 시드: `set.seed(321)`
+- 그룹 수: $J=30$ (MH 비교 안정 위해 과도하게 크지 않게 설정)
+  - `n_j <- sample(20:30, J, TRUE)`, $N = \sum_j n_j$
+  - 그룹 인덱스: `g <- rep(1:J, times = n_j)`
+- 공변량: $p=4$ (절편 포함)\
+  `X <- cbind(1, matrix(rnorm((p-1)*N), N, p-1))`
+- 진실 계수: $\beta_{\text{true}} = (0.7,\ -0.8,\ 0.6,\ 0.0)$
+- 진실 랜덤 인터셉트: $\alpha_j \sim \mathcal N(0, \sigma_b^2)$, $\sigma_b = 0.7$\
+  `alpha_true <- rnorm(J, 0, sigma_b_true)`
+- 선형예측자/확률: $\psi_i = \alpha_{g(i)} + x_i^\top \beta_{\text{true}}$,\
+  $p_i = \mathrm{logit}^{-1}(\psi_i)$
+- 시행수: $n_i \equiv 1$\
+  `y <- rbinom(N, n_i, p_i)`
+
+#### B-2) 사전/하이퍼
+
+- $\beta \sim \mathcal N(b, B)$: `b <- rep(0, p)`, `B <- diag(100, p)`, `Binv <- solve(B)`
+- $\alpha_j \sim \mathcal N(0, \sigma_b^2)$
+- $\sigma_b^2 \sim \mathrm{Inv\text{-}Gamma}(a_0, b_0)$: `a0 <- 2`, `b0 <- 2`
+
+#### B-3) PG–깁스(4-블록) 설정
+
+- 반복/번인: `S = 7000`, `burn = 3000`
+- 단계
+  1)  $\omega_i \sim PG(n_i,\ \alpha_{g(i)} + x_i^\top \beta)$\
+  2)  $\beta \sim \mathcal N(m_\beta, V_\beta)$,\
+      $V_\beta = (X^\top \Omega X + B^{-1})^{-1}$,\
+      $m_\beta = V_\beta \big\{ X^\top (\kappa - \Omega\, \alpha_{g(\cdot)}) + B^{-1} b \big\}$\
+  3)  $\alpha_j \sim \mathcal N(m_{\alpha_j}, V_{\alpha_j})$,\
+      $V_{\alpha_j} = \Big(\sum_{i \in j} \omega_i + \sigma_b^{-2}\Big)^{-1}$,\
+      $m_{\alpha_j} = V_{\alpha_j} \sum_{i \in j} \big(\kappa_i - \omega_i x_i^\top \beta\big)$\
+  4)  $\sigma_b^2 \sim \mathrm{Inv\text{-}Gamma}\!\Big(a_0 + \tfrac{J}{2},\ b_0 + \tfrac12 \sum_{j=1}^J \alpha_j^2\Big)$
+- 초기값: $\beta^{(0)} = \mathbf{0}$, $\alpha^{(0)} \sim \mathcal N(0, 1)$, $\sigma_b^{2(0)} = 1$
+- 수용률: 깁스이므로 각 블록 $1.00$
+
+#### B-4) Metropolis-within-Gibbs(MWG) 설정(비교용)
+
+- 구조: **β는 블록 RWMH**, **α는 스칼라 RWMH(각** $j$), $\sigma^2$는 IG 샘플
+- β 블록 RWMH
+  - 로그사후(α 조건):\
+    $$\log p(\beta \mid y, \alpha)
+      = \sum_i \big[y_i \psi_i - n_i \log(1 + e^{\psi_i})\big]
+        - \tfrac12 (\beta - b)^\top B^{-1} (\beta - b),\quad
+        \psi_i = \alpha_{g(i)} + x_i^\top \beta.$$
+  - 제안 공분산 **기저**: `solve(t(X) %*% X)` (실패 시 `diag(1, p)`)
+  - 스케일: `scale_b = 0.25`
+- α 스칼라 RWMH (각 그룹 $j$)
+  - 로그사후(β, $\sigma^2$ 조건):\
+    $$\log p(\alpha_j \mid \cdot)
+      = \sum_{i \in j} \big[y_i \psi_i - n_i \log(1 + e^{\psi_i})\big]
+        - \tfrac12 \alpha_j^2 / \sigma_b^2, \quad
+        \psi_i = \alpha_j + x_i^\top \beta.$$
+  - 스케일: `scale_a = 0.35`
+- $\sigma_b^2$: $\mathrm{Inv\text{-}Gamma}\!\Big(a_0 + \tfrac{J}{2},\ b_0 + \tfrac12 \sum_j \alpha_j^2\Big)$
+- 반복/번인: `S = 7000`, `burn = 3000`
+- 초기값: $\beta^{(0)} = \mathbf{0}$, $\alpha^{(0)} \sim \mathcal N(0, 1)$, $\sigma_b^{2(0)} = 1$
+- 수용률 리포트:
+  - `beta`: 번인 이후 전체 구간 채택 비율\
+  - `alpha`: 각 그룹 채택 비율의 평균
+
+#### B-5) 평가/출력
+
+- $\beta$의 사후평균/95% 신용구간, $\sigma_b^2$ 사후평균/95% CI
+- ESS/ESS/sec: `coda::effectiveSize()` (열별 ESS 합산), 시간은 `proc.time()`
+- 진실값: $\beta_{\text{true}}$, $\sigma_{b,\text{true}}^2 = 0.49$
+
+------------------------------------------------------------------------
+
+### C. 공통 구현 디테일
+
+- 패키지: `BayesLogit`(PG 샘플: `rpg`), `coda`(ESS)
+- 다변량 정규 샘플: Cholesky 기반 `rmvnorm_chol(mu, Sigma)` 직접 구현
+- 시간 측정: `proc.time()[["elapsed"]]`
+- 수치안정: $(X^\top \Omega X + \text{prior}^{-1})^{-1}$ 은 `solve()` 사용\
+  (실무에선 `chol2inv(chol(.))` 권장)
+- 출력: 사후평균/95% 신용구간/총 ESS/ESS/sec/수용률
+- 참고 비교:
+  - 고정효과: `glm(...)`\
+  - GLMM: 필요 시 `lme4::glmer(...)`

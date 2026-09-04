@@ -1,0 +1,453 @@
+---
+title: "semipar_mixed"
+format: html
+date: "2025-02-22"
+categories: [LMM, code, Semiparametric]
+#image: "image.jpg"
+---
+
+```{r}
+#| message: false
+#|  
+library(nnet)    # multinom
+#library(mclust)  # GMM 군집 + ARI
+library(dplyr)
+library(tidyr)
+library(purrr)
+set.seed(20250808)
+```
+
+본 포스트는 논문 `Semiparametric multinomial mixed-effects models: A university students profiling tool`의 시뮬레이션을 구현해보고 Semiparametric을 이해해보자.
+
+## Data Generating Process (DGP)
+
+### Introduction
+
+논문의 데이터는 공과대학생의 학적을 3개의 범주(초기자퇴,후기자퇴,졸업)으로 나누어 분석하는 것으로 시작한다.
+
+-   `I`는 그룹 여기선 학과이며 100개가 있다고 가정한다.
+
+-   `J`는 `I`그룹안에 학생들을 의미하며 200명이 있다고 가정한다.
+
+-   `k`는 학적을 3개의 범주(초기자퇴,후기자퇴,졸업)을 뜻하며 `K=3`까지 존재한다.
+
+그런데, 100개의 그룹에 대한 효과를 정규분포로 가정하지 않고 어떠한 subpopulations으로 나누어 어떠한 작은 `M (M < 100)`개의 그룹으로 나눈다.
+
+-   baseline범주, `k=1`의 경우는 정의하지 않는다.
+
+-   나머지 `k`는 3,2 개의 subpopulations이 있다 가정하고 $M_2 = 3,\ M_3 = 2$이라 하자
+
+한가지만 하지 않고 3가지 다른 셋팅을 실시합니다.
+
+-   
+
+    1.  one considering only a random intercept
+
+-   
+
+    2.  one considering only a random slope
+
+-   
+
+    3.  one considering both random intercept and random slope
+
+1.  Random intercept case ($\boldsymbol{\eta}_{i k}=\alpha_{1 k} \mathbf{x}_{1 i}+\alpha_{2 k} \mathbf{x}_{2 i}+\delta_{i k}$)
+
+$$
+\begin{aligned}
+\boldsymbol{\eta}_{i 2} & = \begin{cases}+4 \mathbf{x}_{1 i}-3 \mathbf{x}_{2 i}-7 & i=1, \ldots, 30, \\
++4 \mathbf{x}_{1 i}-3 \mathbf{x}_{2 i}-4 & i=31, \ldots, 60, \\
++4 \mathbf{x}_{1 i}-3 \mathbf{x}_{2 i}-2 & i=61, \ldots, 100,\end{cases} \\
+\boldsymbol{\eta}_{i 3} & = \begin{cases}-2 \mathbf{x}_{1 i}+2 \mathbf{x}_{2 i}-5 & i=1, \ldots, 60, \\
+-2 \mathbf{x}_{1 i}+2 \mathbf{x}_{2 i}-2 & i=61, \ldots, 100,\end{cases}
+\end{aligned}
+$$
+
+2.  Random slope case $\left(\boldsymbol{\eta}_{i k}=\alpha_{1 k}+\alpha_{2 k} \mathbf{x}_{1 i}+\delta_{i k} \mathbf{z}_{1 i}\right)$
+
+$$
+\begin{aligned}
+\boldsymbol\eta_{i 2} & = \begin{cases}-1-3 \mathbf{x}_{1 i}+5 \mathbf{z}_{1 i} & i=1, \ldots, 30, \\
+-1-3 \mathbf{x}_{1 i}+2 \mathbf{z}_{1 i} & i=31, \ldots, 60, \\
+-1-3 \mathbf{x}_{1 i}-1 \mathbf{z}_{1 i} & i=61, \ldots, 100,\end{cases} \\
+\boldsymbol\eta_{i 3} & = \begin{cases}-2+2 \mathbf{x}_{1 i}-2 \mathbf{z}_{1 i} & i=1, \ldots, 60, \\
+-2+2 \mathbf{x}_{1 i}-6 \mathbf{z}_{1 i} & i=61, \ldots, 100,\end{cases}
+\end{aligned}
+$$
+
+3.  Random intercept and slope case $\left(\boldsymbol{\eta}_{i k}=\alpha_k \mathbf{x}_{1 i}+\delta_{1 i k}+\delta_{2 i k} \mathbf{z}_{1 i}\right)$
+
+$$
+\begin{aligned}
+\boldsymbol{\eta}_{i 2} & = \begin{cases}-5 \mathbf{x}_{1 i}-6+5 \mathbf{z}_{1 i} & i=1, \ldots, 30, \\
+-5 \mathbf{x}_{1 i}-4+2 \mathbf{z}_{1 i} & i=31, \ldots, 60, \\
+-5 \mathbf{x}_{1 i}-8-1 \mathbf{z}_{1 i} & i=61, \ldots, 100,\end{cases} \\
+\boldsymbol{\eta}_{i 3} & = \begin{cases}+2 \mathbf{x}_{1 i}+1-4 \mathbf{z}_{1 i} & i=1, \ldots, 60, \\
++2 \mathbf{x}_{1 i}-1+2 \mathbf{z}_{1 i} & i=61, \ldots, 100,\end{cases}
+\end{aligned}
+$$
+
+### Code
+
+우선, 첫번째 case(Random Intercept)부터 진행해보자.
+
+```{r}
+# =========================================================
+# JMSPME-INT (Random Intercept only) — paper-faithful mini
+#  - K=3 (baseline=1), random intercept spikes for k=2,3
+#  - EM + Support Reduction (prune + merge)
+#  - Offsets + case-weights with nnet::multinom for fixed effects
+# =========================================================
+suppressPackageStartupMessages(library(nnet))
+
+# ---------- utilities ----------
+softmax3_from_eta <- function(e2, e3) {
+  # 수치안정 softmax: 공통 최대값 m를 빼고 계산
+  m  <- pmax(0, e2, e3)
+  ex2 <- exp(e2 - m)
+  ex3 <- exp(e3 - m)
+  ex0 <- exp(-m)          # baseline의 exp(0 - m)
+  den <- ex0 + ex2 + ex3
+  p2  <- ex2 / den
+  p3  <- ex3 / den
+  cbind(1 - p2 - p3, p2, p3)
+}
+
+# ---------- 1) INT DGP (논문과 동일 계수) ----------
+# k=2: eta = 4*x1 - 3*x2 + delta2
+# k=3: eta = -2*x1 + 2*x2 + delta3
+simulate_int_data <- function(
+  G = 40, n_per_group = 50,
+  beta2 = c(0,  4, -3),      # intercept=0; slopes (x1,x2) for k=2
+  beta3 = c(0, -2,  2),      # intercept=0; slopes (x1,x2) for k=3
+  delta2 = c(-7, -4, -2),    # true spikes for k=2  (M2=3)
+  delta3 = c(-5, -2),        # true spikes for k=3  (M3=2)
+  w_true = NULL,             # length = M2*M3 (row-major, m2 fastest)
+  seed = 1
+){
+  set.seed(seed)
+  M2 <- length(delta2); M3 <- length(delta3); M <- M2*M3
+  if (is.null(w_true)) w_true <- rep(1/M, M)
+
+  draw_combo <- function() {
+    idx <- sample.int(M, 1, prob = w_true)
+    m2  <- ((idx-1) %% M2) + 1
+    m3  <- ((idx-1) %/% M2) + 1
+    c(m2, m3)
+  }
+
+  lst <- vector("list", G)
+  combos <- matrix(NA, G, 2)
+  for (g in 1:G) {
+    cmb <- draw_combo(); combos[g,] <- cmb
+    x1  <- rnorm(n_per_group); x2 <- rnorm(n_per_group)
+    e2  <- beta2[1] + beta2[2]*x1 + beta2[3]*x2 + delta2[cmb[1]]
+    e3  <- beta3[1] + beta3[2]*x1 + beta3[3]*x2 + delta3[cmb[2]]
+    p   <- softmax3_from_eta(e2, e3)
+    y   <- apply(p, 1, function(pr) sample.int(3, 1, prob = pr))
+    lst[[g]] <- data.frame(group=g, x1=x1, x2=x2, y=factor(y, levels=1:3))
+  }
+  df <- do.call(rbind, lst)
+  attr(df, "true") <- list(beta2=beta2, beta3=beta3,
+                           delta2=delta2, delta3=delta3,
+                           w_true=matrix(w_true, nrow=length(delta2), byrow=TRUE))
+  df
+}
+
+# ---------- 2) 그룹 우도 ----------
+group_loglik_one_combo <- function(dat_g, b2, b3, d2, d3) {
+  e2 <- (b2[1] + b2[2]*dat_g$x1 + b2[3]*dat_g$x2) + d2
+  e3 <- (b3[1] + b3[2]*dat_g$x1 + b3[3]*dat_g$x2) + d3
+  p  <- softmax3_from_eta(e2, e3)
+  idx <- cbind(seq_len(nrow(dat_g)), as.integer(dat_g$y))
+  ll  <- sum(log(p[idx]))
+  if (!is.finite(ll)) ll <- -1e12
+  ll
+}
+
+# ---------- 3) E-step: W (그룹 posterior) ----------
+compute_W <- function(df, groups, beta2, beta3, delta2, delta3, weights) {
+  M2 <- length(delta2); M3 <- length(delta3); G <- length(groups)
+  loglik <- array(NA_real_, dim=c(G, M2, M3))
+  for (g in 1:G) {
+    dat_g <- df[df$group==groups[g], ]
+    for (m2 in 1:M2) for (m3 in 1:M3) {
+      loglik[g,m2,m3] <- group_loglik_one_combo(dat_g, beta2, beta3, delta2[m2], delta3[m3])
+    }
+  }
+  W <- array(NA_real_, dim=c(G, M2, M3))
+  logw <- log(pmax(weights, 1e-16))   # prior 안정화
+  for (g in 1:G) {
+    z <- logw + loglik[g,,]
+    z[!is.finite(z)] <- -1e12
+    z <- z - max(z)                   # log-sum-exp
+    num <- exp(z)
+    den <- sum(num)
+    if (!is.finite(den) || den <= 0) { num[] <- 1; den <- length(num) }
+    W[g,,] <- num/den
+  }
+  W
+}
+
+# ---------- 4) M-step: 혼합가중치 ----------
+update_weights <- function(W, eps=1e-4) {
+  w <- apply(W, c(2,3), sum) + eps  # Dirichlet 에폭시
+  w / sum(w)
+}
+
+# ---------- 5) M-step: 고정효과 (offset + case-weights) ----------
+fit_fixed_effects <- function(df, groups, W, delta2, delta3) {
+  M2 <- length(delta2); M3 <- length(delta3)
+  X_list <- list(); off2 <- c(); off3 <- c(); ww <- c()
+  for (g in groups) {
+    dat_g <- df[df$group==g, ]
+    for (m2 in 1:M2) for (m3 in 1:M3) {
+      wgm <- W[g, m2, m3]
+      if (wgm < 1e-12) next
+      X_list[[length(X_list)+1]] <- dat_g
+      off2 <- c(off2, rep(delta2[m2], nrow(dat_g)))  # class-2 offset
+      off3 <- c(off3, rep(delta3[m3], nrow(dat_g)))  # class-3 offset
+      ww   <- c(ww,   rep(wgm,        nrow(dat_g)))  # case weight
+    }
+  }
+  X <- do.call(rbind, X_list)
+  OFF <- cbind(off2, off3)
+  fit <- multinom(y ~ x1 + x2 - 1, data=X, weights=ww, offset=OFF,
+                  trace=FALSE, maxit=500)
+  co  <- coef(fit)  # 2 x 2 (k=2,3) × (x1,x2)
+  list(beta2=c(0, co[1,1], co[1,2]),
+       beta3=c(0, co[2,1], co[2,2]))
+}
+
+# ---------- 6) M-step: 질량점(랜덤 절편) 뉴턴 갱신 ----------
+update_deltas <- function(df, groups, W, beta2, beta3, delta2, delta3,
+                          newton_iter=1, step_cap=0.5) {
+  M2 <- length(delta2); M3 <- length(delta3); G <- length(groups)
+
+  contribs <- function(dat_g, b2, b3, d2, d3) {
+    e2 <- (b2[1] + b2[2]*dat_g$x1 + b2[3]*dat_g$x2) + d2
+    e3 <- (b3[1] + b3[2]*dat_g$x1 + b3[3]*dat_g$x2) + d3
+    p  <- softmax3_from_eta(e2, e3)
+    sI2 <- sum(dat_g$y==2); sI3 <- sum(dat_g$y==3)
+    sp2 <- sum(p[,2]);      sp3 <- sum(p[,3])
+    sv2 <- sum(p[,2]*(1-p[,2])); sv3 <- sum(p[,3]*(1-p[,3]))
+    list(sI2=sI2, sp2=sp2, sv2=sv2, sI3=sI3, sp3=sp3, sv3=sv3)
+  }
+
+  C2 <- array(0, dim=c(G, M2, M3, 3))
+  C3 <- array(0, dim=c(G, M2, M3, 3))
+  for (g in 1:G) {
+    dat_g <- df[df$group==groups[g], ]
+    for (m2 in 1:M2) for (m3 in 1:M3) {
+      cc <- contribs(dat_g, beta2, beta3, delta2[m2], delta3[m3])
+      C2[g,m2,m3,] <- c(cc$sI2, cc$sp2, cc$sv2)
+      C3[g,m2,m3,] <- c(cc$sI3, cc$sp3, cc$sv3)
+    }
+  }
+
+  for (it in 1:newton_iter) {
+    # k=2: m2 고정 → g,m3 합산
+    for (m2 in 1:M2) {
+      W_gm3 <- matrix(W[, m2, , drop=FALSE], nrow=G, ncol=M3)
+      A_gm3 <- matrix(C2[, m2, , 1, drop=FALSE] - C2[, m2, , 2, drop=FALSE], nrow=G, ncol=M3)
+      H_gm3 <- matrix(C2[, m2, , 3, drop=FALSE], nrow=G, ncol=M3)
+      grad <- sum(W_gm3 * A_gm3)
+      hess <- -sum(W_gm3 * H_gm3)
+      step <- if (!is.finite(hess) || hess==0) 0 else grad/hess
+      step <- max(min(step, step_cap), -step_cap)
+      delta2[m2] <- delta2[m2] + step
+    }
+    # k=3: m3 고정 → g,m2 합산
+    for (m3 in 1:M3) {
+      W_gm2 <- matrix(W[, , m3, drop=FALSE], nrow=G, ncol=M2)
+      A_gm2 <- matrix(C3[, , m3, 1, drop=FALSE] - C3[, , m3, 2, drop=FALSE], nrow=G, ncol=M2)
+      H_gm2 <- matrix(C3[, , m3, 3, drop=FALSE], nrow=G, ncol=M2)
+      grad <- sum(W_gm2 * A_gm2)
+      hess <- -sum(W_gm2 * H_gm2)
+      step <- if (!is.finite(hess) || hess==0) 0 else grad/hess
+      step <- max(min(step, step_cap), -step_cap)
+      delta3[m3] <- delta3[m3] + step
+    }
+  }
+
+  list(delta2=delta2, delta3=delta3)
+}
+
+# ---------- 7) 센터링(식별) + 클리핑(가드) ----------
+center_and_clip <- function(delta2, delta3, weights, clip = 12) {
+  w2 <- rowSums(weights); w2 <- w2/sum(w2)
+  w3 <- colSums(weights); w3 <- w3/sum(w3)
+  mu2 <- sum(w2 * delta2); mu3 <- sum(w3 * delta3)
+  delta2 <- pmin(pmax(delta2 - mu2, -clip), clip)  # 가중평균 0으로 정중앙화
+  delta3 <- pmin(pmax(delta3 - mu3, -clip), clip)
+  list(delta2=delta2, delta3=delta3)
+}
+
+# ---------- 8) Support Reduction (prune + merge) ----------
+support_reduction <- function(delta2, delta3, weights,
+                              prune_tol=0.01, merge_tol=0.25,
+                              max_merge_iter=5) {
+  # (A) prune by marginal weights
+  w2 <- rowSums(weights); w3 <- colSums(weights)
+  keep2 <- which(w2 >= prune_tol); if (length(keep2)==0) keep2 <- which.max(w2)
+  keep3 <- which(w3 >= prune_tol); if (length(keep3)==0) keep3 <- which.max(w3)
+  delta2 <- delta2[keep2]; delta3 <- delta3[keep3]
+  weights <- weights[keep2, keep3, drop=FALSE]; weights <- weights/sum(weights)
+
+  # (B) merge nearest (k=2)
+  merge_once_row <- function(delta2, weights) {
+    if (length(delta2) < 2) return(list(delta2=delta2, weights=weights, merged=FALSE))
+    dmat <- as.matrix(dist(delta2)); diag(dmat) <- Inf
+    ij <- which(dmat==min(dmat), arr.ind=TRUE)[1,]
+    i <- ij[1]; j <- ij[2]
+    if (abs(delta2[i]-delta2[j]) > merge_tol) return(list(delta2=delta2, weights=weights, merged=FALSE))
+    w2 <- rowSums(weights)
+    d_new <- (w2[i]*delta2[i] + w2[j]*delta2[j])/(w2[i]+w2[j])
+    weights[i,] <- weights[i,] + weights[j,]
+    weights <- weights[-j,, drop=FALSE]
+    delta2[i] <- d_new; delta2 <- delta2[-j]
+    weights <- weights/sum(weights)
+    list(delta2=delta2, weights=weights, merged=TRUE)
+  }
+  it <- 0
+  repeat {
+    it <- it + 1
+    res <- merge_once_row(delta2, weights)
+    delta2 <- res$delta2; weights <- res$weights
+    if (!res$merged || it>=max_merge_iter) break
+  }
+
+  # (C) merge nearest (k=3)
+  merge_once_col <- function(delta3, weights) {
+    if (length(delta3) < 2) return(list(delta3=delta3, weights=weights, merged=FALSE))
+    dmat <- as.matrix(dist(delta3)); diag(dmat) <- Inf
+    ij <- which(dmat==min(dmat), arr.ind=TRUE)[1,]
+    i <- ij[1]; j <- ij[2]
+    if (abs(delta3[i]-delta3[j]) > merge_tol) return(list(delta3=delta3, weights=weights, merged=FALSE))
+    w3 <- colSums(weights)
+    d_new <- (w3[i]*delta3[i] + w3[j]*delta3[j])/(w3[i]+w3[j])
+    weights[,i] <- weights[,i] + weights[,j]
+    weights <- weights[,-j, drop=FALSE]
+    delta3[i] <- d_new; delta3 <- delta3[-j]
+    weights <- weights/sum(weights)
+    list(delta3=delta3, weights=weights, merged=TRUE)
+  }
+  it <- 0
+  repeat {
+    it <- it + 1
+    res <- merge_once_col(delta3, weights)
+    delta3 <- res$delta3; weights <- res$weights
+    if (!res$merged || it>=max_merge_iter) break
+  }
+
+  list(delta2=delta2, delta3=delta3, weights=weights)
+}
+
+# ---------- 9) 외부 드라이버 (EM + SR) ----------
+JMSPME_INT <- function(df,
+                       max_iter=35,
+                       sr_start=18,              # SR은 충분히 늦게 시작
+                       prune_tol=0.01,           # 작은 가중치 제거 임계
+                       merge_tol=0.25,           # 가까운 질량점 병합 기준
+                       M2_init=6, M3_init=5,     # 과충분 시작 후 SR로 줄임
+                       seed=777) {
+  set.seed(seed)
+  groups <- sort(unique(df$group))
+
+  # 초기 고정효과: 무랜덤(절편은 offsets로 대체하므로 -1)
+  init_fit <- multinom(y ~ x1 + x2 - 1, data=df, trace=FALSE, maxit=500)
+  co <- coef(init_fit)
+  beta2 <- c(0, co[1,1], co[1,2])
+  beta3 <- c(0, co[2,1], co[2,2])
+
+  # 초기 질량점: 넓은 그리드 → SR로 식별 (진짜값 부근 포함)
+  delta2 <- seq(-7.0, -1.0, length.out=M2_init)
+  delta3 <- seq(-5.0, -1.0, length.out=M3_init)
+  weights <- matrix(1/(M2_init*M3_init), nrow=M2_init, ncol=M3_init)
+
+  loglik <- numeric(max_iter)
+
+  for (it in 1:max_iter) {
+    M2 <- length(delta2); M3 <- length(delta3)
+
+    # E-step
+    W <- compute_W(df, groups, beta2, beta3, delta2, delta3, weights)
+
+    # 모니터링용 loglik
+    ll <- 0
+    for (g in seq_along(groups)) {
+      dat_g <- df[df$group==groups[g], ]
+      z <- matrix(NA_real_, nrow=M2, ncol=M3)
+      for (m2 in 1:M2) for (m3 in 1:M3)
+        z[m2,m3] <- log(pmax(weights[m2,m3],1e-16)) + group_loglik_one_combo(dat_g, beta2, beta3, delta2[m2], delta3[m3])
+      mmax <- max(z); ll <- ll + mmax + log(sum(exp(z - mmax)))
+    }
+    loglik[it] <- ll
+
+    # M-step: weights
+    weights <- update_weights(W, eps=1e-4)
+
+    # M-step: fixed effects
+    fe <- fit_fixed_effects(df, groups, W, delta2, delta3)
+    beta2 <- fe$beta2; beta3 <- fe$beta3
+
+    # M-step: deltas
+    de <- update_deltas(df, groups, W, beta2, beta3, delta2, delta3,
+                        newton_iter=1, step_cap=0.5)
+    delta2 <- de$delta2; delta3 <- de$delta3
+
+    # 식별성 & 수치 가드
+    cc <- center_and_clip(delta2, delta3, weights, clip=12)
+    delta2 <- cc$delta2; delta3 <- cc$delta3
+
+    # Support Reduction (논문 방식: 작게/가깝게만 줄임)
+    if (it >= sr_start) {
+      sr <- support_reduction(delta2, delta3, weights,
+                              prune_tol=prune_tol, merge_tol=merge_tol, max_merge_iter=5)
+      delta2 <- sr$delta2; delta3 <- sr$delta3; weights <- sr$weights
+
+      # SR 후에도 센터링 유지
+      cc <- center_and_clip(delta2, delta3, weights, clip=12)
+      delta2 <- cc$delta2; delta3 <- cc$delta3
+    }
+
+    cat(sprintf("Iter %02d | ll=%.3f | M2=%d M3=%d | d2=%s | d3=%s\n",
+                it, ll, length(delta2), length(delta3),
+                paste(round(delta2,2), collapse=","), paste(round(delta3,2), collapse=",")))
+  }
+
+  list(beta2=beta2, beta3=beta3,
+       delta2=delta2, delta3=delta3, weights=weights,
+       loglik=loglik, groups=groups)
+}
+
+# =========================
+# 데모 실행 (논문 INT DGP)
+# =========================
+set.seed(42)
+df <- simulate_int_data(
+  G=40, n_per_group=50,
+  beta2=c(0,4,-3), beta3=c(0,-2,2),
+  delta2=c(-7,-4,-2), delta3=c(-5,-2),
+  w_true = c(0.20,0.10, 0.15,0.25, 0.20,0.10) # row-major (M2=3, M3=2)
+)
+
+fit <- JMSPME_INT(df,
+                  max_iter=35,
+                  sr_start=18,          # 충분히 늦게
+                  prune_tol=0.01,
+                  merge_tol=0.25,
+                  M2_init=6, M3_init=5)
+
+cat("\n===== Estimated spike counts (auto via SR) =====\n")
+cat("M2_hat (k=2) =", length(fit$delta2), " ; M3_hat (k=3) =", length(fit$delta3), "\n")
+cat("\n===== Final spikes & weights =====\n")
+print(list(
+  delta2 = round(fit$delta2, 3),
+  delta3 = round(fit$delta3, 3),
+  weights = round(fit$weights, 3),
+  beta2 = round(fit$beta2, 3),
+  beta3 = round(fit$beta3, 3)
+))
+
+```

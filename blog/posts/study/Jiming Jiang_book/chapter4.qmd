@@ -1,0 +1,162 @@
+---
+title: "Jiming's GLMM Chapter 4 Exercise Review"
+date: "2025-07-15"
+categories: [study, code]
+---
+
+이 포스트는 `Jiming Jiang, Thuan Nguyen - Linear and Generalized Linear Mixed Models and Their Applications`의 연습 문제를 리뷰한다.
+
+## 4.2
+
+**4.1 연습문제를 리만방법으로 쉬운 적분을 직접 코드로 구현해보자**
+
+```{r}
+sim_data <- function(m = 30, k = 5, beta = 0.5, sigma = 1, seed = 1) {
+  set.seed(seed)
+  X <- array(rnorm(m * k), dim = c(m, k))          # 설명변수 1개
+  a <- rnorm(m, 0, sigma)                          # α_i
+  eta <- sweep(X * beta, 1, a, "+")
+  p   <- 1 / (1 + exp(-eta))
+  y   <- matrix(rbinom(m * k, 1, p), nrow = m)
+  list(X = X, y = y)
+}
+
+g_i <- function(alpha, y_i, x_i, beta, sigma) {
+  eta <- x_i * beta + alpha
+  loglik_cond <- y_i * eta - log1p(exp(eta))
+  # log g_i = log L(y|α) + log φ(α)
+  log_g  <- sum(loglik_cond) - (alpha^2) / (2 * sigma^2) - 0.5 * log(2 * pi * sigma^2)
+  exp(log_g)   # g_i(α)
+}
+
+simple_loglik <- function(dat, beta, sigma,
+                          M = 6,           # 적분 한계 A=-Mσ, B=Mσ
+                          delta = 0.05) {  # 간격 Δ
+  X <- dat$X;  y <- dat$y
+  m <- nrow(X); k <- ncol(X)
+
+  A <- -M * sigma;  B <-  M * sigma
+  alpha_grid <- seq(A, B, by = delta)
+  Delta      <- delta
+
+  logL_vec <- numeric(m)
+  for (i in 1:m) {
+    g_vals <- vapply(alpha_grid, g_i,
+                     FUN.VALUE = numeric(1),
+                     y_i = y[i, ], x_i = X[i, ],
+                     beta = beta, sigma = sigma)
+    L_i <- sum(g_vals) * Delta          # Σ g_i(α_l) Δ
+    logL_vec[i] <- log(L_i)
+  }
+  sum(logL_vec)                         # 전체 로그우도
+}
+```
+
+```{r}
+# (a) 모의 자료
+dat <- sim_data(m = 30, k = 5, beta = 0.5, sigma = 1, seed = 42)
+
+# (b) 진짜 모수에서의 로그우도 (단순 적분)
+ll_simple <- simple_loglik(dat, beta = 0.5, sigma = 1, M = 6, delta = 0.05)
+print(ll_simple)
+
+# (c) 간격을 더 조밀하게
+ll_simple_fine <- simple_loglik(dat, beta = 0.5, sigma = 1, M = 6, delta = 0.01)
+```
+
+## 4.2 Gauss–Hermite방법 사용
+
+**4.1 연습문제를 직접 코드로 구현해보자**
+
+랜덤효과인 $\alpha_i$의 경우 정규분포를 따르기 때문에 $w(x)=e^{-x^2}$의 형태가 나온다.
+
+그러므로 Gauss–Hermite방법을 사용한다.
+
+#### 변수변환
+
+이 방법을 쓰기 위해선 가능도 함수를 $w(x)=e^{-x^2}$의 형태가 나올 수 있게끔 변수변환을 진행해준다.
+
+$$
+\begin{equation}
+L_i(\beta, \sigma)=\int_{-\infty}^{\infty} \exp \left\{\sum_{j=1}^k\left[y_{i j}\left(x_{i j}^{\top} \beta+\alpha_i\right)-\log \left(1+e^{x_{i j}^{\top} \beta+\alpha_i}\right)\right]\right\} \frac{1}{\sqrt{2 \pi \sigma^2}} \exp \left(-\frac{\alpha_i^2}{2 \sigma^2}\right) d \alpha_i
+\end{equation}
+$$
+
+치환 $\quad \alpha=\sqrt{2} \sigma v, \quad d \alpha=\sqrt{2} \sigma d v$
+
+그럼, $\quad \phi(\alpha) d \alpha=\frac{1}{\sqrt{2 \pi \sigma^2}} e^{-\alpha^2 / 2 \sigma^2} d \alpha=\frac{1}{\sqrt{\pi}} e^{-v^2} dv$로 치환할수 있다.
+
+위 우도함수는 다음과 같이 쓸수 있다.
+
+$$
+\begin{equation}
+\begin{gathered}
+L_i(\beta, \sigma)=\frac{1}{\sqrt{\pi}} \int_{-\infty}^{\infty} f(v_i; \beta, \sigma) e^{-v_i^2} d v_i \\
+f(v_i ; \beta, \sigma)=\exp \left[\sum_{j=1}^k\left\{y_{i j}\left(x_{i j}^{\top} \beta+\sqrt{2} \sigma v_i\right)-\log \left(1+e^{x_{i j}^{\top} \beta+\sqrt{2} \sigma v_i}\right)\right\}\right] .
+\end{gathered}
+\end{equation}
+$$
+
+$e^{-v_i^2}$로 식을 치환해줬으니 Gauss–Hermite방법을 적용한다.
+
+#### Gauss–Hermite
+
+$$
+\begin{equation}
+\int_{-\infty}^{\infty} f(v) w(v) d v \approx \sum_{q=1}^Q \lambda_q f\left(v_q\right),
+\end{equation}
+$$
+
+-   $x_q$ : 차수 $Q$ Hermite 다항식 $H_Q$ 의 근
+
+-   $\lambda_q=\frac{2^{Q-1} Q!\sqrt{\pi}}{Q^2\left[H_{Q-1}\left(x_q\right)\right]^2}$.
+
+다시 $L_i(\beta, \sigma)$에 대입해보면
+
+$$
+\begin{equation}
+L_i(\beta, \sigma) \approx \frac{1}{\sqrt{\pi}} \sum_{q=1}^Q \lambda_q f\left(v_{iq} ; \beta, \sigma\right)
+\end{equation}
+$$
+
+이것의 가능도 함수의 값을 R로 계산해보자
+
+```{r}
+# 필요 패키지
+library(statmod)       # gauss.quad()  → Hermite 노드·가중치 (λ_q, x_q)
+
+# 1) 예제 4.1 데이터 시뮬레이션 -------------------------------
+sim_data <- function(m = 30, k = 5, beta = 0.5, sigma = 1, seed = 1) {
+  set.seed(seed)
+  X <- array(rnorm(m * k), dim = c(m, k))          # 설명변수 1개
+  a <- rnorm(m, 0, sigma)                          # α_i
+  eta <- sweep(X * beta, 1, a, "+")                # η_{ij}
+  p   <- 1 / (1 + exp(-eta))
+  y   <- matrix(rbinom(m * k, 1, p), nrow = m)
+  list(X = X, y = y)
+}
+
+# 2) 군집별 우도: 식 (◆) -------------------------------------
+loglik_GH <- function(dat, beta, sigma, Q = 20) {
+  gh  <- gauss.quad(Q, kind = "hermite")           # (x_q, λ_q)
+  x_q <- gh$nodes
+  lam <- gh$weights
+  const <- sqrt(2) * sigma
+  
+  logL <- numeric(nrow(dat$X))
+  for (i in seq_len(nrow(dat$X))) {
+    # f_i(x_q)
+    eta_mat <- dat$X[i, ] * beta + outer(const * x_q, rep(1, ncol(dat$X)))
+    log_cond <- t(dat$y[i, ] * eta_mat - log1p(exp(eta_mat)))
+    f_i <- exp(colSums(log_cond))
+    L_i <- sum(lam * f_i) / sqrt(pi)               # (◆)
+    logL[i] <- log(L_i)
+  }
+  sum(logL)
+}
+
+# 3) 실행 예
+d  <- sim_data()
+ll <- loglik_GH(d, beta = 0.5, sigma = 1, Q = 20)
+print(ll)
+```

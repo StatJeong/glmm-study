@@ -1,0 +1,11 @@
+.DS_Store
+.Rhistory
+.RData
+.RDataTmp*
+.Rproj.user/
+.quarto/
+_freeze/
+_site/
+*.pyc
+__pycache__/
+.ipynb_checkpoints/

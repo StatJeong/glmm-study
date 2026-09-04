@@ -1,0 +1,232 @@
+---
+title: "semipar_mixed_methology"
+format: html
+date: "2025-08-22"
+categories: [LMM, Semiparametric]
+#image: "image.jpg"
+---
+
+본 포스트는 논문 `Semiparametric multinomial mixed-effects models: A university students profiling tool` 의 Semiparametric을 이해해보자.
+
+### 소개
+
+-   본 논문은 다항형(multinomial) 반응변수를 가지는 계층적 데이터(hierarchical data) 분석을 위한 모델을 제안.
+
+-   학생들은 학과 내에 속해 있으므로, **학생 수준 데이터가 학과 수준 그룹에 중첩되어 있는 2수준 구조(two-level hierarchy)**를 가진다.
+
+-   랜덤효과를 정규분포가 아니라 **"다변량 이산 분포(multivariate discrete distribution)"**로 가정.
+
+-   이산 분포의 **지지점 개수(support points)**는 사전에 정하지 않으며 추정 과정에서 결정됨.
+
+### 기존 접근법의 한계
+
+-   일반적인 GLMM에서는 랜덤효과가 다변량 정규분포를 따른다고 가정.
+
+$$
+\delta_{i k} \sim \mathcal{N}\left(0, \Sigma_k\right) .
+$$
+
+-   그러나 다항 반응의 경우 다중 적분이 필요해 계산이 복잡하고, 근사(예: Laplace, Gauss–Hermite quadrature)를 써야 하는데, 이는 계산량이 많고 어렵고 편향도 존재함.
+
+$$
+\begin{aligned}
+\text{to maximize} \quad \log L & = \sum_{i=1}^I \log h\left(\mathbf{Y}_i\right)\\
+h\left(\mathbf{Y}_i\right)&=\int_\theta p\left(\mathbf{Y}_i \mid \boldsymbol{\theta}\right) g(\boldsymbol{\theta}) d \boldsymbol{\theta}
+\end{aligned}
+$$
+
+-   특히, 명목형(nominal) 반응변수는 누적확률 기반의 ordinal 모델보다 덜 연구되었음.
+
+### 모형
+
+$$
+Y_{i j}= \begin{cases}\text { Graduate } & \pi_{i j 1} \\ \text { Early dropout } & \pi_{i j 2} \\ \text { Late dropout } & \pi_{i j 3}\end{cases}
+$$
+
+-   각 관촉치 $Y_{i j}$ 는 학과 $i$ 내 학생 $j$ 에 해당
+
+-   반응 변수는 $K$개의 명목형 범주를 가짐 (졸업, 조기 중도탈락, 후기 중도탈락).
+
+-   기준범주 로짓 모형(baseline-category logit model) 사용:
+
+$$
+\log \left(\frac{\pi_{i j k}}{\pi_{i j 1}}\right)=\eta_{i j k}=x_{i j}^{\prime} \alpha_k+z_{i j}^{\prime} \delta_{i k}
+$$
+
+-   $\alpha_k$: 고정효과 계수
+
+-   $\delta_{ik}$ 학과 수준 랜덤효과
+
+### 데이터의 형태
+
+-   시뮬레이션에서 말하는 DGP(Data Generating Process)를 확인해본다.
+
+1.  Random intercept case ($\boldsymbol{\eta}_{i k}=\alpha_{1 k} \mathbf{x}_{1 i}+\alpha_{2 k} \mathbf{x}_{2 i}+\delta_{i k}$)
+
+$$
+\begin{aligned}
+\boldsymbol{\eta}_{i 2} & = \begin{cases}+4 \mathbf{x}_{1 i}-3 \mathbf{x}_{2 i}-7 & i=1, \ldots, 30, \\
++4 \mathbf{x}_{1 i}-3 \mathbf{x}_{2 i}-4 & i=31, \ldots, 60, \\
++4 \mathbf{x}_{1 i}-3 \mathbf{x}_{2 i}-2 & i=61, \ldots, 100,\end{cases} \\
+\boldsymbol{\eta}_{i 3} & = \begin{cases}-2 \mathbf{x}_{1 i}+2 \mathbf{x}_{2 i}-5 & i=1, \ldots, 60, \\
+-2 \mathbf{x}_{1 i}+2 \mathbf{x}_{2 i}-2 & i=61, \ldots, 100,\end{cases}
+\end{aligned}
+$$
+
+논문의 데이터는 공과대학생의 학적을 3개의 범주(초기자퇴,후기자퇴,졸업)으로 나누어 분석하는 것으로 시작한다.
+
+-   `I`는 그룹 여기선 학과이며 100개가 있다고 가정한다.
+
+-   `J`는 `I`그룹안에 학생들을 의미하며 200명이 있다고 가정한다.
+
+-   `k`는 학적을 3개의 범주(초기자퇴,후기자퇴,졸업)을 뜻하며 `K=3`까지 존재한다.
+
+그런데, 100개의 그룹에 대한 효과를 정규분포로 가정하지 않고 어떠한 subpopulations으로 나누어 어떠한 작은 `M (M < 100)`개의 그룹으로 나눈다.
+
+-   baseline범주, `k=1`의 경우는 정의하지 않는다.
+
+-   나머지 `k`는 3,2 개의 subpopulations이 있다 가정하고 $M_2 = 3,\ M_3 = 2$이라 하자
+
+### 제안된 방법: 준모수적 다항 혼합효과 모형 (MSPEM)
+
+-   랜덤효과가 정규분포가 아니라 이산(discrete) 분포를 따른다고 가정.
+
+-   랜덤효과 분포를 몇 개의 support points(질점, mass points)와 가중치로 표현.
+
+-   support points의 개수는 사전에 고정하지 않고 데이터로부터 추정.
+
+$$
+\mathbf{B}=\left\{\begin{array}{l}
+\left\{\begin{array}{l}
+\mathbf{b}_{12}, \mathbf{b}_{22}, \ldots, \mathbf{b}_{M2}, \\
+\left(w_{12}\right),\left(w_{22}\right), \ldots,\left(w_{M2}\right),
+\end{array}\right. \\
+\ldots \\
+\left\{\begin{array}{l}
+\mathbf{b}_{1 K}, \mathbf{b}_{2 K}, \ldots, \ldots, \mathbf{b}_{M_K K}, \\
+\left(w_{1 K}\right),\left(w_{2 K}\right), \ldots, \ldots,\left(w_{M_K K}\right) .
+\end{array}\right.
+\end{array}\right.
+$$
+
+-   where $\sum_{m_k=1}^{M_k} w_{m_k k}= 1$ and $w_{m_k} \geq 0$,
+
+-   고전적인 MCMC가 아닌, EM 알고리즘으로 고정효과 및 랜덤효과 지지점과 가중치를 동시에 추정.
+
+-   지지점 간 거리가 작으면 하나로 병합(collapse) $\to$ 모델 단순화.
+
+1.  조건부 가능도(같은 그룹 내 독립 가정)와 그룹 수준 표현
+
+$$
+\begin{aligned}
+p\left(\mathbf{Y}_i \mid \mathbf{A}, \mathbf{\Delta}_i\right) & =\prod_{j=1}^{n_i} p\left(Y_{i j} \mid \mathbf{A}, \mathbf{\Delta}_i\right)=\prod_{j=1}^{n_i} \prod_{k=1}^K \pi_{i j k}^{\mathbf{1}_{\left\{Y_{i j}=k\right\}}} \\
+& =\prod_{j=1}^{n_i} \prod_{k=1}^K\left(\frac{\exp \left(\eta_{i j k}\right)}{1+\sum_{l=2}^K \exp \left(\eta_{i j l}\right)}\right)^{\mathbf{1}_{\left\{Y_{i j}=k\right\}}}
+\end{aligned}
+$$
+
+-   여기서 $\boldsymbol{A}=\left(\alpha_2, \ldots, \alpha_K\right), \Delta_i=\left(\delta_{i 2}, \ldots, \delta_{i K}\right)$
+
+2.  marginal likelihood 표현
+
+-   $K>2$이면, 각 대비(=각 로짓)마다 이산분포가 따로 있으므로, 가능한 $K−1$차원 질량점 조합을 전부 합친다.
+
+-   표기 간소화를 위해 $m=1, \ldots, M_{\mathrm{tot}}$ 으로 모든 조합을 인덱싱하고, 조합별 가중치 $w_{m,}$ 조합 별 랜덤효과 벡터 $B_m$ 로 쓰면
+
+$$
+h\left(Y_i \mid A\right)=\sum_{m=1}^{M_{\text {tot }}} w_m p\left(Y_i \mid A, B_m\right)
+$$
+
+$$
+\begin{aligned}
+h(\mathbf{Y} \mid \boldsymbol{A}) & \\
+= & w_{12} \times w_{13} \times \cdots \times w_{1 K} \times p\left(\mathbf{Y} \mid \boldsymbol{A}, \mathbf{b}_{12}, \mathbf{b}_{13}, \ldots, \mathbf{b}_{1 K}\right) \\
+& +w_{22} \times w_{13} \times \cdots \times w_{1 K} \times p\left(\mathbf{Y} \mid \boldsymbol{A}, \mathbf{b}_{22}, \mathbf{b}_{13}, \ldots, \mathbf{b}_{1 K}\right) \\
+& +\cdots \\
+& +\cdots \\
+& +w_{M_22} \times w_{M_33} \times \cdots \times w_{M_KK} \times p\left(\mathbf{Y} \mid \boldsymbol{A}, \mathbf{b}_{M_22}, \mathbf{b}_{M_33}, \ldots, \mathbf{b}_{M_KK}\right) .
+\end{aligned}
+$$
+
+### EM알고리즘
+
+1.  E-step
+
+$$
+w_{m_k k}^{(\mathrm{up})}=\frac{1}{I} \sum_{i=1}^I W_{i m_k k} \quad m_k=1, \ldots, M_k
+$$
+
+$$
+W_{i m_k k}=\frac{w_{m_k k} p\left(\mathbf{y}_i \mid \boldsymbol{A}, \mathbf{b}_{m_k k}, \overline{\mathbf{b}}_{l \neq k}\right)}{\sum_{\gamma=1}^{M_k} w_{\gamma k} p\left(\mathbf{y}_i \mid \boldsymbol{A}, \mathbf{b}_{\gamma k}, \overline{\mathbf{b}}_{l \neq k}\right)} \quad m_k=1, \ldots, M_k
+$$
+
+-   의미: 그룹 $i$가 $k$번째 대비의 $m_k$번째 subpop에 속할 사후확률
+
+-   여기서 $b_{\ell \neq k}$ 는 다른 대비들의 랜덤효과 이산분포의 평균(직전 반복에서 계산): $\bar{b}_{\ell}=\sum_{m_{\ell}=1}^{M_{\ell}} w_{m_{\ell} \ell}^{(\text {old })} b_{m_{\ell} \ell}^{(\text {old })}$
+
+$$
+p\left(\mathbf{y}_i \mid \boldsymbol{\alpha}_k, \boldsymbol{\alpha}_{l \neq k}^{(\mathrm{old})}, \mathbf{b}_{m_k k}, \overline{\mathbf{b}}_{l \neq k}^{(\mathrm{old})}\right)=\prod_{j=1}^{n_i} \prod_{\gamma=1}^K\left(\frac{\exp \left(\eta_{i j \gamma}\right)}{1+\sum_{v=2}^K \exp \left(\eta_{i j v}\right)}\right)^{\left\{\mathbf{1}_{y_{i j}=\gamma}\right\}}
+$$
+
+where,
+
+$$
+\eta_{i j \gamma}= \begin{cases}\mathbf{x}_{i j}^{\prime} \boldsymbol{\alpha}_k+\mathbf{z}_{i j}^{\prime} \mathbf{b}_{m_k} & \text { if } \gamma=k, \\ \mathbf{x}_{i j}^{\prime} \boldsymbol{\alpha}_\gamma^{(\text {old })}+\mathbf{z}_{i j}^{\prime} \sum_{m_\gamma=1}^{M_\gamma} w_{m_\gamma \gamma}^{(\text {old })} \mathbf{b}_{m_\gamma \gamma}^{(\text {old })} & \text { if } \gamma \neq k .\end{cases}
+$$
+
+-   $W$
+
+$$
+\begin{aligned}
+W_{i m_k k} & =\frac{w_{m_k k} p\left(\mathbf{y}_i \mid \boldsymbol{A}, \mathbf{b}_{m_k k}, \overline{\mathbf{b}}_{l \neq k}\right)}{\sum_{\gamma=1}^{M_k} w_{\gamma k} p\left(\mathbf{y}_i \mid \boldsymbol{A}, \mathbf{b}_{\gamma k}, \overline{\mathbf{b}}_{l \neq k}\right)} \\
+& =\frac{p\left(\boldsymbol{\delta}_{i k}=\mathbf{b}_{m_k k}\right) p\left(\mathbf{y}_i \mid \boldsymbol{A}, \mathbf{b}_{m_k k}, \overline{\mathbf{b}}_{l \neq k}\right)}{p\left(\mathbf{y}_i \mid \boldsymbol{A}\right)} \\
+& =\frac{p\left(\mathbf{y}_i, \boldsymbol{\delta}_{i k}=\mathbf{b}_{m_k} \mid \boldsymbol{A}, \overline{\mathbf{b}}_{l \neq k}\right)}{p\left(\mathbf{y}_i \mid \boldsymbol{A}, \overline{\mathbf{b}}_{l \neq k}\right)} \\
+& =p\left(\boldsymbol{\delta}_{i k}=\mathbf{b}_{m_k} k \mid \mathbf{y}_i, \boldsymbol{A}, \overline{\mathbf{b}}_{l \neq k}\right) .
+\end{aligned}
+$$
+
+2.  M-step
+
+위 가중치를 업데이트 한 후에
+
+$$
+\left(\alpha_k^{(\mathrm{up})}, b_{1 k}^{(\mathrm{up})}, \ldots, b_{M_k k}^{(\mathrm{up})}\right)=\arg \max _{\alpha_k,\left\{b_{m_k k}\right\}} \sum_{m_k=1}^{M_k} \sum_{i=1}^I W_{i m_k k} \ln p\left(y_i \mid \alpha_k, \alpha_{\ell \neq k}^{(\mathrm{old})}, b_{m_k k}\bar{b}_{\ell \neq k}^{(\mathrm{old})}\right).
+$$
+
+밑에 두 단계로 나누어서 계산
+
+$$
+b_{m_k k}^{(\mathrm{up})}=\arg \max _{b_k} \sum_{i=1}^I W_{i m_k k} \ln p\left(y_i \mid A, b_k, \bar{b}_{\ell \neq k}\right)
+$$
+
+-   위에서 얻은 $b_{m_k k}^{(\mathrm{up})}$ 를 고정한 채 (13)식을 $\alpha_k$ 에 대해 최대화
+
+$$
+\begin{aligned}
+\hat{\boldsymbol{\delta}}_{i k} & =\mathbf{b}_{\tilde{m}_k k} \quad \text { where } \tilde{m}_k=\underset{m_k}{\arg \max } W_{i m_k k}, \\
+i & =1, \ldots, N, \quad k=2, \ldots, K .
+\end{aligned}
+$$
+
+-   의미: E-step 사후확률이 최대인 질점이 그 그룹의 $\delta_{i k}$ 추정값(plug-in). 잠재 하위집단 할당과 동일
+
+3.  서포트 포인트 축소 규칙
+
+-   각 대비 $k=2, \ldots, K$ 에 대해 임계거리 $D_k$ 를 정한다.
+
+-   같은 대비 $k$ 의 두 질점 $b_m^k$ 과 $b_{\ell}^k$ 사이의 유클리드 거리가 $<D_k$ 이면, 하나로 합친다:
+
+$$
+b_{m, \ell}^k=\frac{b_m^k+b_{\ell}^k}{2}, \quad w_{m, \ell}^k=w_m^k+w_{\ell}^k .
+$$
+
+(즉, 위치는 산술평균, 가중치는 합.)
+
+-   진행 순서: 먼저 $D_k$ 미만인 쌍들 중 거리가 가장 짧은 두 점부터 합치고, 그다음 짧은 쌍을 반복... $D_k$ 미만인 쌍이 없어질 때까지 진행.
+
+-   $D_k$ 는 대비마다 다르게 줄 수 있다
+
+-   어떤 반복부터는 대비 $k$ 에 대해 가중치 임계치 $\tilde{w}_k$ 를 두고,
+
+$$
+w_m^k<\tilde{w}_k \Rightarrow \text { 해당 support points 제거. }
+$$

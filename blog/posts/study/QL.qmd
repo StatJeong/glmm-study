@@ -1,0 +1,531 @@
+---
+title: ""
+author: ""
+format:
+  html:
+    embed-resources: true
+    html-math-method: katex
+date: "2026-06-15"
+categories: [GLMM, study, quasi-likelihood, PQL]
+number-sections: true
+---
+
+# Quasi-Likelihood 에서 PQL 까지 — Pawitan *In All Likelihood* 14장 · 17.8–17.10
+
+이 노트는 두 파트로 구성된다. **Part I(14장)**은 준우도를 "추정방정식 · M-추정 · 강건성"의 틀에서 다루는 고정효과 라인(GEE 포함)이고, **Part II(17.8–17.10)**는 그 준우도를 무작위효과로 확장한 GLMM과 그 근사 추정(=PQL)이다. 표기는 책을 따른다.
+
+---
+
+# Part I. 추정방정식과 준우도 (Ch. 14)
+
+## 두 층위의 working model
+
+완전한 확률 구조를 명시하기 어려운 문제(비정규 시계열, 반복측정, 종단자료)에서는 참 모형과 꼭 일치하지 않는 **작업 모형(working model)**을 쓴다. 이는 두 층위에서 지정된다.
+
+- **우도 수준(likelihood level)**: 우도를 추정·모형비교용 목적함수로만 취급한다. 장점은 AIC로 모형 비교가 가능하다는 것이다.
+- **점수방정식 수준(score equation level)**: 방정식 $\sum_i \psi(y_i,\theta)=0$ 을 풀어 추정한다. 이를 **추정방정식 접근** 또는 **M-추정**이라 부른다.
+
+추정방정식 접근은 적절한 우도와 연결될 필요가 없어 더 약하고 일반적인 지정을 허용한다. 관심 모수에만 집중할 수 있다는 것이 이점이다. 적률법(method of moments)이 그 한 예이며, 현대적 이론은 Durbin(1960)·Godambe(1960)에서 시작됐다.
+
+## 준우도의 정의: 평균과 분산만
+
+GLM에서 가장 중요한 추정방정식이 나온다. 관측 $y_i$에 대해
+
+$$
+E(y_i) = \mu_i(\beta), \qquad \mathrm{var}(y_i) = \phi\, v_i(\beta)
+$$
+
+를 가정한다($v_i(\cdot)$는 알려진 분산함수, $\phi$는 분산모수). $\beta$의 추정은
+
+$$
+\sum_{i=1}^n \frac{\partial \mu_i}{\partial \beta}\, v_i^{-1}(y_i - \mu_i) = 0 \tag{14.1}
+$$
+
+의 해다. (14.1)에 딸린 목적함수가 **준우도**이며, 두 특징을 갖는다.
+
+- **준모수적(semi-parametric)**: 확률 구조를 지정하지 않고 평균과 분산만 지정한다. 분포의 모양은 완전히 자유롭게 둔다. 비정규 다변량 자료를 다루는 유용한 전략이다.
+- **제한된 추론**: 모형화가 제한적이라 추론도 제한적이다. 점추정 중심이고, 검정·CI는 추정량의 점근정규성(Wald형)에 의존한다. 정확 추론은 대개 없고(부트스트랩·경험적 우도로 보완), AIC가 없어 모형 비교는 내포(nested) 모형에 한정된다.
+
+## 예시로 보는 감각 (14.1)
+
+- **일표본 평균**: $E(y_i)=\mu$, $\mathrm{var}(y_i)=\sigma^2$이면 (14.1)은 $\sum_i \sigma^{-2}(y_i-\mu)=0$, 해는 $\hat\mu=\bar y$. 평균만 맞으면 매우 넓은 분포족에서 일치한다(독립조차 필요 없음).
+- **선형모형**: $E(y_i)=x_i^\top\beta$, $\mathrm{var}(y_i)=\sigma_i^2$이면 가중최소제곱 $\hat\beta=(X^\top V^{-1}X)^{-1}X^\top V^{-1}Y$.
+- **포아송 회귀**: $\mu_i=e^{x_i^\top\beta}$, $\mathrm{var}(y_i)=\mu_i$이면 (14.1)은 $\sum_i x_i(y_i - e^{x_i^\top\beta})=0$, 이는 포아송 모형의 점수방정식과 정확히 같다. 즉 포아송 우도 추정은 평균·분산이 옳은 한 분포 가정에 강건하고, 참 분포가 포아송이면 효율적(=MLE)이다.
+
+## 지수족 스코어와의 연결: QL은 어디서 오는가
+
+준우도는 원래 분포 없이 평균·분산만으로 정의됐다(Wedderburn 방식). 그런데 여기서 자연스러운 질문이 생긴다 — **이 추정방정식 (14.1)은 어떤 우도의 스코어함수와 같지 않을까?** 지수족을 잠깐 우도로 가정하고 스코어를 계산해 보면, 그 답이 나온다.
+
+지수족에서 $i$번째 로그우도 기여를
+
+$$
+\log L_i = \frac{y_i\theta_i - A(\theta_i)}{\phi} + c(y_i,\phi) \tag{14.2}
+$$
+
+로 두면, $\theta_i$에 대한 스코어와 정보는
+
+$$
+S_i = \frac{\partial \log L_i}{\partial \theta_i} = \frac{y_i - A'(\theta_i)}{\phi},
+\qquad
+I_i = -\frac{\partial^2 \log L_i}{\partial \theta_i^2} = \frac{A''(\theta_i)}{\phi}.
+$$
+
+여기서 누율함수 $A$를 평균·분산에 맞춰 **역으로 짓는다**. 즉 $A'(\theta_i)=\mu_i$, $A''(\theta_i)=v_i(\mu_i)$가 되도록 고른다. 그러면 스코어 분자가 곧 "관측 $-$ 평균"이 되므로 스코어의 두 기본 성질이 자동으로 따라온다.
+
+$$
+E S_i = \frac{E(y_i)-A'(\theta_i)}{\phi} = 0,
+\qquad
+\mathrm{var}(S_i) = \frac{\mathrm{var}(y_i)}{\phi^2} = \frac{A''(\theta_i)}{\phi} = E(I_i).
+$$
+
+이제 이 스코어를 회귀계수 $\beta$까지 연결한다. 링크 $h(\mu_i)=x_i^\top\beta$, 정준링크 $\theta_i=h(\mu_i)$를 둔다. $\log L$은 $\theta_i$를 통해 $\beta$에 의존하므로 연쇄법칙으로 미분을 옮긴다.
+
+$$
+S(\beta)=\frac{\partial \log L}{\partial \beta}
+=\sum_i \frac{\partial \log L_i}{\partial \theta_i}\cdot\frac{\partial \theta_i}{\partial \beta}
+$$
+
+**조각 1: $\dfrac{\partial \log L_i}{\partial \theta_i}$.** 이것은 위에서 구한 스코어 $S_i$ 그 자체다. $A'(\theta_i)=\mu_i$로 지었으므로
+
+$$
+\frac{\partial \log L_i}{\partial \theta_i} = \frac{y_i - A'(\theta_i)}{\phi} = \frac{y_i-\mu_i}{\phi}.
+$$
+
+여기까지 대입하면 스코어는 이미 "잔차 $\times$ $\partial\theta_i/\partial\beta$"의 형태가 된다.
+
+$$
+S(\beta)=\phi^{-1}\sum_i (y_i-\mu_i)\,\frac{\partial \theta_i}{\partial \beta}. \tag{$\ast$}
+$$
+
+**조각 2: $\dfrac{\partial \theta_i}{\partial \beta}$를 평균의 언어로 바꾸기.** ($\ast$)에는 아직 자연모수 $\theta_i$가 남아 있다. 이를 우리가 실제로 다루는 $\mu_i$로 바꾸려 한다. 직접 $\partial\theta_i/\partial\beta$를 구하는 대신, 반대 방향 $\partial\mu_i/\partial\beta$가 더 쉬우므로 그것을 먼저 구해 관계식을 얻는다. $\mu_i=A'(\theta_i)$이므로 $\beta$로 미분하면
+
+$$
+\frac{\partial \mu_i}{\partial \beta}
+=\frac{\partial A'(\theta_i)}{\partial \beta}
+=A''(\theta_i)\,\frac{\partial \theta_i}{\partial \beta}
+=v_i\,\frac{\partial \theta_i}{\partial \beta},
+$$
+
+마지막 등호는 $A''(\theta_i)=v_i(\mu_i)$로 지었기 때문이다. 이 관계식을 $\partial\theta_i/\partial\beta$에 대해 풀면
+
+$$
+\frac{\partial \theta_i}{\partial \beta} = v_i^{-1}\,\frac{\partial \mu_i}{\partial \beta}.
+$$
+
+**두 조각 합치기.** 이것을 ($\ast$)에 넣는다.
+
+$$
+S(\beta)=\phi^{-1}\sum_i (y_i-\mu_i)\,\Big(v_i^{-1}\frac{\partial \mu_i}{\partial \beta}\Big)
+=\phi^{-1}\sum_i \frac{\partial \mu_i}{\partial \beta}\, v_i^{-1}(y_i-\mu_i).
+$$
+
+정리하면
+
+$$
+\boxed{\,S(\beta)=\phi^{-1}\sum_i \frac{\partial \mu_i}{\partial \beta}\, v_i^{-1}(y_i-\mu_i)\,}
+$$
+
+이 되어, **지수족 우도의 스코어방정식 $S(\beta)=0$이 준우도 추정방정식 (14.1)과 정확히 일치한다.** 이것이 이 절의 핵심이다: QL은 하늘에서 떨어진 것이 아니라, 지수족 스코어에서 분포 고유 정보($A(\theta)$의 구체적 형태, $c(y,\phi)$)가 사라지고 평균·분산만 남은 형태다.
+
+**순서를 뒤집으면 두 가지가 보인다.** McCullagh(1983)의 표현대로, 보통은 "우도 (14.2) → 미분 → 적률"의 순서지만, 준우도는 "적률에서 시작해 우도를 역구성"한다. 이 역방향에서 두 결론이 나온다.
+
+- **QL의 정체**: 준우도 추정방정식은 지수족 스코어의 일반화다. 그런 우도(분포)가 실제로 존재할 필요는 없다 — $A(\theta)$를 짓기만 하면 된다.
+- **지수족 우도의 강건성**: 거꾸로, 지수족 우도로 최대우도추정을 하면 그 스코어방정식이 (14.1)이고, (14.1)은 평균·분산만 옳으면 일치추정을 준다. 따라서 **지수족 우도로 적합해도, 실제 분포가 그 지수족이 아니더라도 평균·분산 모형만 맞으면 $\hat\beta$는 일치한다**(책 표현: consistent for a much wider class of distributions than specified by the likelihood itself). 예컨대 포아송으로 적합했는데 실제로는 과대산포여도, 평균 구조만 옳으면 $\hat\beta$는 여전히 믿을 만하다(다만 표준오차는 robust 분산으로 보정해야 한다).
+
+이 강건성은 사실 Gauss–Markov 정리의 정신과 같다. Gauss–Markov가 "분포 없이 2차 적률만으로, 선형·불편 추정량 중 OLS가 최소분산"임을 보장하듯, 준우도 추정량도 "평균·분산만으로, 선형영향·점근불편 추정량 중 최소 점근분산"이라는 의미의 최적성을 갖는다(McCullagh 1983). 전역선형→국소선형, 정확불편→점근불편으로 약화된 대신, 비선형·비정규 상황까지 넓게 적용되는 일반화된 버전이다.
+
+## 계산: IWLS = Gauss–Newton (14.2절)
+
+추정방정식 (14.1)은 $\mu_i=h^{-1}(x_i^\top\beta)$가 $\beta$에 비선형으로 들어가 있어 한 번에 풀리지 않는다. 그래서 **반복법**을 쓴다. 핵심 아이디어는 "비선형 문제를 매 단계 선형회귀로 근사해 풀고, 그 답으로 다시 근사하기를 반복"하는 것이며, 이를 **반복재가중최소제곱(Iteratively Reweighted Least Squares, IWLS)**이라 부른다. 같은 절차가 Gauss–Newton, 가중최소제곱, (정준링크면) Newton–Raphson과 일치한다.
+
+**1단계 — 왜 "작업벡터"가 필요한가.** 문제는 관측 $y_i$가 원래 스케일(예: 개수, 0/1)에 있는데, 회귀는 링크 스케일 $\eta_i=h(\mu_i)=x_i^\top\beta$에서 선형이라는 점이다. 두 스케일을 잇기 위해, 관측을 링크 스케일로 끌어올린 **작업벡터(working vector)** $Y_i$를 만든다. 현재 추정값 $\beta_0$에서 $\eta_i^0=x_i^\top\beta_0$, $\mu_i^0=h^{-1}(\eta_i^0)$를 계산하고, $h(y_i)$를 $\mu_i^0$ 주변에서 1차 테일러 전개한다.
+
+$$
+h(y_i) \approx h(\mu_i^0) + \frac{\partial h}{\partial \mu_i}(y_i - \mu_i^0)
+= \eta_i^0 + \frac{\partial h}{\partial \mu_i}(y_i - \mu_i^0).
+$$
+
+이 우변을 작업벡터로 정의한다(관측 $y$와 구분해 대문자 $Y$를 쓴다).
+
+$$
+Y_i = x_i^\top\beta_0 + \frac{\partial h}{\partial \mu_i}(y_i - \mu_i^0).
+$$
+
+직관적으로 $Y_i$는 "관측 $y_i$를 링크 스케일로 옮긴 가짜 관측치(pseudo-observation)"다. 첫 항 $x_i^\top\beta_0$는 현재 예측, 둘째 항 $\frac{\partial h}{\partial\mu_i}(y_i-\mu_i^0)$는 잔차를 링크 스케일로 환산한 보정이다.
+
+**2단계 — 왜 "재가중"인가.** 작업벡터 $Y_i$들은 정밀도가 서로 다르다. 분산이 큰 관측은 덜 믿고 작은 관측은 더 믿어야 하므로, **각 $Y_i$의 분산의 역수를 가중치로 쓴다.** $Y_i$의 분산은 잔차항 $\frac{\partial h}{\partial\mu_i}(y_i-\mu_i^0)$에서 오고, $\mathrm{var}(y_i)=\phi v_i$이므로
+
+$$
+\Sigma_{ii} = \Big(\frac{\partial h}{\partial \mu_i}\Big)^2 \phi\, v_i \quad(\text{작업벡터의 분산}),
+\qquad
+w_i = \frac{1}{\Sigma_{ii}} \quad(\text{가중치}).
+$$
+
+가중최소제곱은 잔차 제곱합 $\sum_i w_i (Y_i - x_i^\top\beta)^2 = \sum_i \frac{1}{\Sigma_{ii}}(Y_i - x_i^\top\beta)^2$을 최소화한다. 분산 $\Sigma_{ii}$가 크면 가중치 $1/\Sigma_{ii}$가 작아져 그 관측을 덜 반영하고, 작으면 더 반영한다 — 이것이 "분산 큰 건 덜 믿는다"의 식 표현이다. 행렬로 쓰면 가중치 전체가 $\Sigma^{-1}$이 되며, $\Sigma=\mathrm{diag}\{\Sigma_{ii}\}$는 작업벡터의 (대각) 분산행렬이다. $v_i=v_i(\mu_i^0)$도 현재값에서 평가하므로 매 반복마다 가중치가 새로 계산된다 — 이것이 "재가중(reweighted)"의 뜻이다.
+
+**3단계 — 가중회귀 한 번 풀기.** 이제 $Y$를 반응변수, $X$를 설계행렬, $\Sigma^{-1}$을 가중치로 하는 **가중최소제곱**을 풀면 다음 추정값이 나온다.
+
+$$
+\beta_1 = (X^\top \Sigma^{-1} X)^{-1} X^\top \Sigma^{-1} Y.
+$$
+
+이는 통상적인 가중최소제곱해 $\hat\beta=(X^\top W X)^{-1}X^\top W Y$에서 가중치 $W=\Sigma^{-1}$을 쓴 형태다.
+
+**4단계 — 반복.** $\beta_1$으로부터 $\mu_i$, 작업벡터 $Y$, 가중치 $\Sigma$를 다시 계산하고 위를 반복한다. 작업벡터와 가중치가 매번 갱신되므로 "반복재가중"이다. 갱신값이 더 이상 변하지 않으면(수렴) 그 값이 (14.1)의 해 $\hat\beta$다.
+
+$$
+\begin{aligned}
+&\textbf{반복 } t = 0, 1, 2, \dots \\[4pt]
+&\quad \eta_i = x_i^\top \beta_t, \quad \mu_i = h^{-1}(\eta_i), \quad d_i = \frac{\partial h}{\partial \mu_i} \\[4pt]
+&\quad Y_i = \eta_i + d_i(y_i - \mu_i) \qquad (\text{작업벡터}) \\[4pt]
+&\quad w_i = \frac{1}{d_i^2\, v_i(\mu_i)} \qquad (\text{가중치}, \phi \text{ 생략 가능}) \\[4pt]
+&\quad \beta_{t+1} = (X^\top W X)^{-1} X^\top W Y \qquad (W = \mathrm{diag}\{w_i\}) \\[4pt]
+&\textbf{수렴 시 } \hat\beta = \beta_{t+1}
+\end{aligned}
+$$
+
+정리하면 IWLS는 **"작업벡터로 비선형성을 선형화 → 분산으로 재가중 → 가중회귀 → 반복"**의 절차이며, 비정규 QL 추정을 매 단계 익숙한 선형회귀 하나로 환원한다. (뒤에서 볼 PQL은 이 구조에 무작위효과 벌점을 더해, 매 단계를 가중 선형회귀 대신 가중 **선형혼합모형**으로 바꾼 것이다.)
+
+## 점근분포: naive 분산과 robust 분산 (14.3절)
+
+순수 추정방정식 접근에서는 정확 추론이 없으므로 $\hat\beta$의 추론이 **점근결과에 의존**한다. 핵심은 두 갈래로 나뉜다 — 분산 지정을 옳다고 볼 것인가(naive), 아무 가정도 하지 않을 것인가(robust). 분산 지정이 거의 맞으면 둘은 가까워진다.
+
+**먼저 일치성부터 분리한다.** 스코어의 우도적 관점
+
+$$
+S(\beta) = \phi^{-1}\sum_i \frac{\partial \mu_i}{\partial \beta}\, v_i^{-1}(y_i - \mu_i)
+$$
+
+에서, $E(y_i)=\mu_i$이기만 하면 **분산 지정과 무관하게** $E_\beta S(\beta)=0$이 성립한다. 따라서 $\hat\beta$의 일치성은 오직 평균 모형의 정확성에만 달려 있고, 분산이 틀려도 일치한다. 분산 지정의 정확성은 **표준오차(효율)에만** 영향을 준다.
+
+**분산이 옳다고 가정할 때(naive).** $\mathrm{var}(y_i)=\phi v_i$이면 스코어의 분산을 직접 전개한다.
+
+$$
+\mathrm{var}\{S(\beta)\}
+= \phi^{-1}\sum_i \frac{\partial \mu_i}{\partial \beta}\, v_i^{-1}\,\underbrace{v_i}_{=\,\mathrm{var}(y_i)/\phi}\,v_i^{-1}\, \frac{\partial \mu_i}{\partial \beta^\top}
+= \phi^{-1}\sum_i \frac{\partial \mu_i}{\partial \beta}\, v_i^{-1}\, \frac{\partial \mu_i}{\partial \beta^\top}.
+$$
+
+한편 기대 Fisher 정보도 같은 형태로 나온다.
+
+$$
+E\Big\{-\frac{\partial S(\beta)}{\partial \beta^\top}\Big\}
+= \phi^{-1}\sum_i \frac{\partial \mu_i}{\partial \beta}\, v_i^{-1}\, \frac{\partial \mu_i}{\partial \beta^\top}
+= X^\top \Sigma^{-1} X.
+$$
+
+두 값이 같으므로 표준 우도이론의 항등식 $\mathrm{var}\{S(\beta)\}=I(\beta)$가 성립하고,
+
+$$
+\hat\beta \sim N\big(\beta,\ (X^\top\Sigma^{-1}X)^{-1}\big).
+$$
+
+이를 **naive 분산 공식**이라 부른다.
+
+> **예 14.1 (포아송 회귀).** 표준 포아송($\phi=1$, 로그링크) $\mu_i=e^{x_i^\top\beta}$, $\mathrm{var}(y_i)=\mu_i$이면 작업분산은 $\Sigma_{ii}=(\partial h/\partial\mu_i)^2 v_i = (1/\mu_i)^2\mu_i = 1/\mu_i$이므로
+> $$
+> \hat\beta \sim N\Big(\beta,\ \big(\textstyle\sum_i \mu_i x_i x_i^\top\big)^{-1}\Big),
+> $$
+> 즉 평균이 큰 관측이 큰 가중을 받는다.
+
+**분산 지정을 신뢰하지 않을 때(robust/sandwich).** 최소제곱 관점으로 본다. 참 $\beta$를 시작값으로 두면 작업벡터와 작업분산은
+
+$$
+Y_i = x_i^\top\beta + \frac{\partial h}{\partial\mu_i}(y_i-\mu_i) = x_i^\top\beta + e_i^*,
+\qquad
+\Sigma_{ii} = \Big(\frac{\partial h}{\partial\mu_i}\Big)^2 \phi v_i,
+$$
+
+이고 $\hat\beta=(X^\top\Sigma^{-1}X)^{-1}X^\top\Sigma^{-1}Y$이다. 그런데 이제 실제 분산 $\mathrm{var}(Y)=\Sigma_Y \neq \Sigma$이므로 정규근사의 분산은 단순화되지 않고 다음 형태로 남는다.
+
+$$
+\mathrm{var}(\hat\beta)=(X^\top\Sigma^{-1}X)^{-1}\,X^\top\Sigma^{-1}\Sigma_Y\Sigma^{-1}X\,(X^\top\Sigma^{-1}X)^{-1}.
+$$
+
+이를 **robust 분산 공식**이라 하며, 가정한 분산이 틀려도 옳다(13.4절 robust 분산의 특수 케이스). 실무에서는 $\Sigma_Y$를 $\mathrm{diag}[(e_i^*)^2]$로 추정하여 가운데 항을
+
+$$
+\widehat{X^\top\Sigma^{-1}\Sigma_Y\Sigma^{-1}X} = \sum_i \frac{(e_i^*)^2}{\Sigma_{ii}^2}\, x_i x_i^\top
+$$
+
+로 계산한다. 이 공식은 **과대산포를 자동으로 처리**하므로 naive 공식보다 선호되며, 분산 지정이 어려운 상황(종단자료 등, 다음 14.4절 GEE)에서 특히 유용하다.
+
+## GEE: 다변량 확장 (14.4절)
+
+반복측정·종단자료에서 한 개체가 군집(벡터) $y_i$를 이룬다. Zeger & Liang(1986)은 추정방정식이 다변량에 즉시 적용됨을 보였다.
+
+$$
+\sum_i \frac{\partial \mu_i}{\partial \beta}\, V_i^{-1}(y_i - \mu_i) = 0 \tag{14.4}
+$$
+
+여기서 $A_i=\mathrm{diag}\{v_i(\mu_{ij})\}$, **작업 상관행렬** $R_i(\alpha)$에 대해
+
+$$
+V_i = \phi\, A_i^{1/2} R_i(\alpha) A_i^{1/2}.
+$$
+
+$R_i(\alpha)$의 대표 구조: 독립(=반복구조 무시), **exchangeable**(복합대칭, 무작위효과 구조), **AR(1)** $\mathrm{cor}(y_{it},y_{it'})=\alpha^{|t-t'|}$, 비모수. $\beta$는 위와 같은 Gauss–Newton으로, $\phi,\alpha$는 정규화 잔차의 적률로 추정한다.
+
+## robust M-추정과 점근 성질 (14.5–14.6절)
+
+**robust 추정(14.5)**은 이상치에 저항하는 또 다른 M-추정 갈래다. $\psi(\cdot)$ 함수의 모양이 모형을 규정한다 — 정규, Cauchy/$t_k$(무거운 꼬리), 이중지수($L_1$=중앙값), $L_p$ 등.
+
+**점근 성질(14.6)**은 13.4절(잘못된 모형 하 MLE)과 평행하다. $\hat\theta$는 참 추정방정식 $\lambda(\theta)=E\psi(Y,\theta)=0$의 해로 일치하며(정리 14.1–14.2, $\psi$가 단조/유계일 때), 점근정규성(정리 14.3)이 성립한다.
+
+---
+
+# Part II. GLMM 과 벌점화 준우도 (§17.8–17.10)
+
+## GLMM이 왜 필요한가 (17.8)
+
+이항·포아송 모형의 과대산포(overdispersion)에 **구조를 부여**하는 것이 GLMM의 새로움이다. 무작위효과 $b_i$ 자체가 관심 대상이면 GLMM 지정이 필수다. 조건부로 $b_i$가 주어지면 $y_i$가 인식 가능한 분포를 따르고, $b_i$는 관측되지 않은 변수들을 대리한다.
+
+**예시로 보는 동기.**
+
+- **발아 자료(이항).** $y_i \sim \text{Bin}(n, p_i)$, $\mathrm{logit}\,p_i = \beta_0 + b_i$. $b_i$가 정규면 **이항–정규**, $\mathrm{logit}$ 스케일에서 $b_i$가 베타를 유도하면 **베타–이항**.
+- **가족당 자녀 수(포아송).** $y_i \sim \text{Poisson}(\mu_i)$, $\log\mu_i = \beta_0 + b_i$. $b_i$가 정규면 **포아송–정규**, $e^{b_i}$가 감마면 **포아송–감마**. 후자는 주변분포가 음이항이 되어 명시적 주변우도를 얻을 수 있다(4.5절).
+
+**일반 지정.** $b$가 주어지면 $y_i$는 독립적으로 지수족을 따른다.
+
+$$
+\log p(y_i\mid b) = \frac{y_i\psi_i - A(\psi_i)}{\phi} + c(y_i,\phi),
+\qquad h(\mu) = X\beta + Zb.
+$$
+
+즉 조건부로 $y_i$는 평균 $\mu_i$, 분산 $\phi v_i(\mu_i)$를 갖는다. $b$는 반드시 정규일 필요는 없으며, $\theta$는 $\phi$와 $b$ 지정에 필요한 모수를 모두 포함한다.
+
+**주변분산 분해.** 무작위효과가 과대산포를 어떻게 만드는지 분산 분해로 보인다.
+
+$$
+\mathrm{var}(y_i) = E\{\mathrm{var}(y_i\mid b)\} + \mathrm{var}\{E(y_i\mid b)\}
+= \phi\, E\{v_i(\mu_i)\} + \mathrm{var}(\mu_i).
+$$
+
+첫 항은 분산족(dispersion family)의 기여, 둘째 항은 무작위효과의 기여다. 과대산포가 두 곳에서 올 수 있다.
+
+> **예 17.4 (포아송–감마의 주변분산).** 조건부로 $y$가 평균 $\mu$, 분산 $\phi\mu$이고 $\log\mu = \beta_0 + b$, $e^b$가 평균 1·분산 $\nu$인 감마라 하자. 그러면 주변평균 $Ey = e^{\beta_0}$, 주변분산은
+> $$
+> \mathrm{var}(y) = \phi e^{\beta_0} + \nu e^{2\beta_0} = \phi\, Ey + \nu(Ey)^2.
+> $$
+> $\phi=1$이면 포아송–감마(=음이항), $\nu=0$이면 분산족 포아송으로 환원된다. 즉 GLMM은 더 풍부한 과대산포 패턴을 담는다.
+
+---
+
+## 정통 경로: 랜덤효과를 적분한 주변우도 (17.9)
+
+무작위효과 $b$는 추정할 모수가 아니라 확률변수다. 따라서 우도에서 제거하려면 **적분해야** 하고, 그 결과가 고정모수의 **주변우도(marginal likelihood)**다.
+
+$$
+L(\beta,\theta) = \int p(y\mid b)\,p(b)\,db.
+$$
+
+군집 $i$가 독립이면 이는 군집별 적분의 곱으로 분리된다. 무작위절편만 있는 경우($b_i$가 스칼라, 군집당 하나) 군집 $i$의 기여는
+
+$$
+L_i(\beta,\theta) = \int_{-\infty}^{\infty} p(y_i\mid b_i)\,p(b_i)\,db_i .
+$$
+
+정규–정규 혼합모형(17.2절)에서는 이 적분이 정규×정규라 닫힌형으로 풀리지만, 일반적인 경우는 악명 높게 어렵다. 이항–정규로 구체적으로 전개한다.
+
+### 이항–정규 주변우도
+
+조건부로 $y_i \sim \text{Bin}(n_i, p_i)$, 링크는 $\mathrm{logit}\,p_i = x_i^\top\beta + b_i$, 랜덤효과 $b_i \sim N(0,\sigma^2)$. 먼저 링크를 풀어 $p$를 $b$의 함수로 명시한다.
+
+$$
+\mathrm{logit}\,p = \eta_i + b, \quad \eta_i \equiv x_i^\top\beta
+\;\;\Longrightarrow\;\;
+p = p(b) = \frac{e^{\eta_i + b}}{1 + e^{\eta_i + b}}, \quad
+1-p = \frac{1}{1 + e^{\eta_i + b}}.
+$$
+
+관측 $y_i = k$의 주변확률은 $b_i$에 대한 기댓값, 즉 적분이다.
+
+$$
+P(y_i = k)
+= E_{b_i}\{P(y_i=k\mid b_i)\}
+= \int_{-\infty}^{\infty} \binom{n_i}{k}\, p(b)^k\,\{1-p(b)\}^{\,n_i-k}\;
+\frac{1}{\sqrt{2\pi}\,\sigma}\,e^{-b^2/2\sigma^2}\, db .
+$$
+
+이항 확률질량에 $p(b) = \dfrac{e^{\eta_i+b}}{1+e^{\eta_i+b}}$를 대입하면 피적분함수가 명시적으로 드러난다.
+
+$$
+p(b)^k\{1-p(b)\}^{n_i-k}
+= \frac{(e^{\eta_i+b})^k}{(1+e^{\eta_i+b})^k}\cdot\frac{1}{(1+e^{\eta_i+b})^{n_i-k}}
+= \frac{e^{k(\eta_i+b)}}{(1+e^{\eta_i+b})^{n_i}} .
+$$
+
+따라서 군집 $i$, 관측값 $k$의 주변확률은
+
+$$
+P(y_i=k) = \binom{n_i}{k}\frac{1}{\sqrt{2\pi}\,\sigma}
+\int_{-\infty}^{\infty}
+\frac{e^{k(\eta_i+b)}}{\big(1+e^{\eta_i+b}\big)^{n_i}}\;
+e^{-b^2/2\sigma^2}\; db
+\;\equiv\; p(n_i,k,\beta,\sigma^2). \tag{$\ast$}
+$$
+
+고정모수의 주변 로그우도는 이 군집별 확률의 로그합이다.
+
+$$
+\log L(\beta,\sigma^2) = \sum_i \log p(n_i, y_i, \beta, \sigma^2).
+$$
+
+$n_i \equiv n$이면 $y_i = k$인 관측 수를 $m_k$라 하여 $\log L(\beta,\sigma^2) = \sum_k m_k \log p(n,k,\beta,\sigma^2)$로 줄어든다.
+
+### 왜 이 적분이 닫히지 않는가 (수식으로)
+
+($\ast$)의 피적분함수를 지수부 하나로 묶어 본다.
+
+$$
+\frac{e^{k(\eta_i+b)}}{\big(1+e^{\eta_i+b}\big)^{n_i}}\,e^{-b^2/2\sigma^2}
+= \exp\!\Big\{\, k(\eta_i+b) \;-\; n_i\log\!\big(1+e^{\eta_i+b}\big) \;-\; \frac{b^2}{2\sigma^2} \,\Big\}.
+$$
+
+지수 안의 세 항을 보면:
+
+- $k(\eta_i+b)$ — $b$에 **선형**
+- $-\dfrac{b^2}{2\sigma^2}$ — $b$에 **이차** (정규밀도에서 옴)
+- $-\,n_i\log\!\big(1+e^{\eta_i+b}\big)$ — **로그–지수(log-sum-exp) 항**
+
+문제는 세 번째 항이다. 만약 이 항이 없었다면(즉 선형+이차만 있었다면) 전체가 가우시안 적분이라 닫힌형으로 풀린다 — 정규–정규 모형이 바로 그 경우다. 그러나 로그–지수 항 $\log(1+e^{\eta_i+b})$는 $b$의 다항식도, 지수함수도, 그 유한한 조합도 아니다. 지수부가 "이차 + 로그–지수"의 혼합이 되면, 이 함수의 **원시함수(부정적분)를 초등함수로 표현할 수 없다.** 즉
+
+$$
+\int \exp\!\Big\{ k(\eta_i+b) - n_i\log(1+e^{\eta_i+b}) - \tfrac{b^2}{2\sigma^2} \Big\}\, db
+$$
+
+는 닫힌형 해가 없다.
+
+### 그래서 수치적분, 그리고 고차원의 벽
+
+닫힌형이 없으므로 ($\ast$)의 적분은 **수치적분**으로 계산한다. 표준 도구는 가우시안 구적법(Gauss–Hermite quadrature)으로, 적분을 노드 $\{b^{(g)}\}$와 가중치 $\{w_g\}$의 유한합으로 근사한다.
+
+$$
+\int_{-\infty}^{\infty} f(b)\,e^{-b^2/2\sigma^2}\,db \;\approx\; \sum_{g=1}^{Q} w_g\, f(b^{(g)}).
+$$
+
+여기서 tractability가 차원에 따라 갈린다.
+
+- **랜덤효과가 독립일 때**: 주변우도가 군집별 **단일(1차원) 적분들의 곱**으로 분리되므로, 각 군집마다 $Q$개 노드로 합을 계산하면 된다. 군집 $m$개면 비용은 대략 $O(mQ)$로 실행 가능하다.
+
+- **랜덤효과가 상관될 때**: 적분이 분리되지 않아 **다차원 적분**이 된다. 랜덤효과 차원이 $d$이면 구적법 노드 수가 $Q^d$로 지수적으로 폭발한다(차원의 저주). 예컨대 노드 $Q=20$, 차원 $d=5$이면 한 적분당 $20^5 = 3.2\times 10^6$개 노드를 평가해야 한다. 따라서 상관·고차원에서는 exact 접근이 더 이상 tractable하지 않다.
+
+포아송–감마처럼 주변분포가 음이항으로 닫히는 특수 케이스만 예외적으로 명시적 주변우도를 준다(4.5절). 일반적으로는 이 정통 경로가 고차원에서 막히므로, 다음 절에서 적분을 하지 않는 우회로로 넘어간다.
+
+## 우회로: 결합우도와 근사 (17.10) — PQL의 정체
+
+적분이 막히므로, 책은 **무작위효과를 적분하지 않고 그대로 둔 결합우도(joint likelihood)**에서 출발한다.
+
+$$
+\log L(\beta,\theta,b) = \log p(y\mid b) + \log p(b).
+$$
+
+Lee & Nelder(1996)는 이를 **h-우도(hierarchical likelihood)**라 부른다. 원문 표현: 결합우도 $L(\beta,\theta,b)$는 주변우도 $L(\beta,\theta)$보다 평가·최적화가 **훨씬 쉽다**. 정당화 근거로 (1) 정규 모형(17.4절)에서 고정 $\theta$일 때 결합우도의 $\hat\beta$가 주변우도의 것과 같고, (2) 포아송–감마도 그러하며, Breslow-Clayton(1993)이 실용성을, Lee-Nelder(1996)가 두 추정이 **점근적으로 가까움**을 보였다.
+
+
+**2차 근사로 IWLS 유도.** 고정 $\theta$에서 결합우도를 2차 근사한다. 지수족 부분을 초기값 $\beta_0, b_0$ 주변에서 전개하면
+
+$$
+-\tfrac{1}{2}\log|\Sigma| - \tfrac{1}{2}(Y - X\beta - Zb)^\top \Sigma^{-1}(Y - X\beta - Zb), \tag{17.23}
+$$
+
+여기서 작업벡터와 그 분산은
+
+$$
+Y_i = x_i^\top\beta_0 + z_i^\top b_0 + \frac{\partial h}{\partial \mu_i}(y_i - \mu_i^0),
+\qquad
+\Sigma_{ii} = \Big(\frac{\partial h}{\partial \mu_i}\Big)^2 \phi\, v_i(\mu_i^0),
+$$
+
+$\phi v_i(\mu_i^0)$는 $b$가 주어졌을 때 $y_i$의 조건부 분산이고, $\partial h/\partial\mu_i$도 현재값에서 평가한다.
+
+**정규 랜덤효과일 때.** $b\sim N(0,D)$, $D=D(\theta)$이면 랜덤효과 로그밀도 $-\frac{1}{2}\log|D| - \frac{1}{2}b^\top D^{-1}b$가 붙어
+
+$$
+\log L(\beta,\theta,b) \approx
+-\tfrac{1}{2}\log|\Sigma| - \tfrac{1}{2}(Y - X\beta - Zb)^\top \Sigma^{-1}(Y - X\beta - Zb)
+- \tfrac{1}{2}\log|D| - \tfrac{1}{2}b^\top D^{-1} b. \tag{17.24}
+$$
+
+마지막 항 $-\frac{1}{2}b^\top D^{-1}b$가 $b$를 0으로 수축시키는 **벌점항**이다 — 무작위효과 분포 $N(0,D)$가 목적함수에서 벌점으로 나타난 것이며, 이것이 "**penalized** quasi-likelihood"의 유래다. (17.24)를 $\beta,b$로 최대화하면 혼합모형 방정식이 된다.
+
+$$
+\begin{bmatrix} X^\top \Sigma^{-1} X & X^\top \Sigma^{-1} Z \\ Z^\top \Sigma^{-1} X & Z^\top \Sigma^{-1} Z + D^{-1} \end{bmatrix}
+\begin{bmatrix} \beta \\ b \end{bmatrix}
+=
+\begin{bmatrix} X^\top \Sigma^{-1} Y \\ Z^\top \Sigma^{-1} Y \end{bmatrix}. \tag{17.25}
+$$
+
+우하단 블록의 $D^{-1}$이 벌점의 흔적이다. $Y$와 $\Sigma$를 다시 계산하며 반복(backfitting)하므로, **GLMM 추정은 정규이론 공식의 반복 적용**으로 귀착된다.
+
+**비정규 무작위효과.** $b$가 정규가 아니면, 먼저 $\log p(b)$를 2차형으로 근사하는 한 단계를 더한다. $\ell(b_i)=\log p(b_i)$라 할 때 초기값 $b_i^0$에서
+
+$$
+\log p(b_i) \approx \log p(b_i^c) + \tfrac{1}{2}\ell''(b_i^0)(b_i - b_i^c)^2,
+\qquad b_i^c = b_i^0 - \frac{\ell'(b_i^0)}{\ell''(b_i^0)}.
+$$
+
+$D^{-1} = \mathrm{diag}[-\ell''(b_i^0)]$(랜덤효과의 Fisher 정보)로 두면 벡터형 $b^c = b^0 + D\ell'(b^0)$, 그리고 $\log p(b) = \log p(b^c) - \frac{1}{2}(b-b^c)^\top D^{-1}(b-b^c)$. 이를 지수족 2차 근사와 결합하면 갱신식은
+
+$$
+\begin{bmatrix} X^\top \Sigma^{-1} X & X^\top \Sigma^{-1} Z \\ Z^\top \Sigma^{-1} X & Z^\top \Sigma^{-1} Z + D^{-1} \end{bmatrix}
+\begin{bmatrix} \beta \\ b \end{bmatrix}
+=
+\begin{bmatrix} X^\top \Sigma^{-1} Y \\ Z^\top \Sigma^{-1} Y + D^{-1}b^c \end{bmatrix}, \tag{17.26}
+$$
+
+(17.25)와 같되 우변에 $D^{-1}b^c$ 항만 추가된다. 정규 경우는 $b^c = 0$이라 (17.25)로 환원된다.
+
+> **예 17.9 (감마 랜덤효과).** $e^{b_i}$가 평균 1·형상 $\alpha$인 감마면 $\ell(b_i) = \alpha b_i - \alpha e^{b_i} + \alpha\log\alpha - \log\Gamma(\alpha)$, $\ell'(b_i) = \alpha - \alpha e^{b_i}$, $\ell''(b_i) = -\alpha e^{b_i}$. 시작값 $b^0$에서 $D^{-1} = \mathrm{diag}[\alpha e^{b^0}]$, $b^c = b^0 + e^{-b^0} - 1$.
+
+**분산성분 $\theta$ 추정 (중요).** 원문이 명시하는 핵심 디테일: **정규 경우에도 분산모수 $\theta$는 결합우도 $L(\beta,b,\theta)$로 계산할 수 없다.** 대신 수정 프로파일 우도(17.5절과 동형)를 최대화한다.
+
+$$
+\log L(\theta) = \log L(\beta,\theta,\hat b) - \tfrac{1}{2}\log|Z^\top\Sigma^{-1}Z + D^{-1}|, \tag{17.27}
+$$
+
+$\beta$와 $\hat b$는 고정 $\theta$에서 앞서처럼 계산한다.
+
+> **확실치 않음.** 원문은 "GLMM의 근사적 분산성분 추정법은 아직 합의된 형태에 이르지 못했다(have not yet settled to an agreed form)"고 명시하며, (17.27)은 Lee-Nelder(1996)를 따르는 **유력한 후보**로 제시된다. 즉 이 방식이 유일한 표준은 아니다.
+
+---
+
+## 정통 경로와 우회로의 관계 (요약)
+
+- **17.9 (정통, 적분)**: 랜덤효과는 모수가 아니므로 적분해 주변우도 $L(\beta,\theta)=\int p(y\mid b)p(b)db$를 만든다. 개념적으로 옳지만, 일반적으로 **닫힌형이 없어 수치적분에 의존**하며, 상관·고차원에서 tractable하지 않다.
+- **17.10 (우회, 근사)**: 적분 대신 결합우도 $\log p(y\mid b) + \log p(b)$에서 출발해 2차 근사 → IWLS/혼합모형 방정식. 무작위효과 분포가 벌점 $-\frac{1}{2}b^\top D^{-1}b$로 나타나므로 이 절차가 곧 **PQL**이다. 분산성분 $\theta$는 결합우도로 못 구해 수정 프로파일 (17.27)로 추정하며, 그 형태는 아직 합의되지 않았다.
+
+## 이것이 PQL이다 — 연결과 한계
+
+(17.24)–(17.25)의 절차가 곧 **PQL**이다. 요약하면: 비정규 조건부 우도를 작업벡터 $Y$로 선형화하고, 무작위효과 분포를 벌점 $-\tfrac{1}{2}b^\top D^{-1}b$로 넣어, 매 반복을 **작업 선형혼합모형**으로 푼다. 이는 Breslow & Clayton(1993)의 PQL과 동일한 기계다.
+
+출발점은 GLMM의 주변우도 적분이고, 그것을 Laplace로 근사하니 정규 LMM과 같은 2차 목적함수가 강제되어 LMM 기계를 빌려 쓰는 것이다. 정규반응이면 $v_i\equiv 1$이라 근사가 정확해지므로, LMM은 PQL이 정확해지는 특수 경우다.
+
+**한계:** 단일 근사이므로 이항·희소·소군집에서 분산성분을 과소추정한다. 이 편향을 줄이는 방향이 보정 PQL, 고차 Laplace, AGHQ, 그리고 가우시안 변분근사(GVA)로 이어진다.
+
+---
+
+# 두 파트의 관계
+
+- **14장**: 준우도의 고정효과·강건성·GEE 라인. 무작위효과 없이 상관을 $R_i(\alpha)$로 흡수하며, 적분이 생기지 않는다(모집단 평균 관점).
+- **17.8–17.10**: 같은 준우도를 무작위효과 $b\sim N(0,D)$로 확장. 주변우도에 적분이 생기고, 이를 근사한 것이 PQL이다(개체별 관점).
+
+두 파트를 묶으면 "평균·분산만 지정 → 강건한 추정"이라는 하나의 철학이 고정효과(14장)에서 무작위효과(17장)로 확장되는 흐름이 된다.
+
+---
+
+## 참고문헌
+
+> Wedderburn, R. W. M. (1974). Quasi-likelihood functions, generalized linear models, and the Gauss–Newton method. *Biometrika*, 61(3), 439–447.
+>
+> McCullagh, P. (1983). Quasi-likelihood functions. *The Annals of Statistics*, 11(1), 59–67.
+>
+> Nelder, J. A., & Pregibon, D. (1987). An extended quasi-likelihood function. *Biometrika*, 74(2), 221–232.
+>
+> Liang, K.-Y., & Zeger, S. L. (1986). Longitudinal data analysis using generalized linear models. *Biometrika*, 73(1), 13–22.
+>
+> Breslow, N. E., & Clayton, D. G. (1993). Approximate inference in generalized linear mixed models. *JASA*, 88(421), 9–25.
+>
+> Lee, Y., & Nelder, J. A. (1996). Hierarchical generalized linear models. *JRSS-B*, 58(4), 619–678.
+>
+> Pawitan, Y. (2013). *In All Likelihood: Statistical Modelling and Inference Using Likelihood*. Oxford University Press. (Ch. 14, §17.8–17.10)

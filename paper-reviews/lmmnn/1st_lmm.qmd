@@ -1,0 +1,123 @@
+---
+title: "Review lmmnn"
+author: "정영두"
+institute: "Department of Statistics, University of Seoul"
+date: today
+format:
+  beamer: 
+    fontsize: "8pt"
+    include-in-header: latex/preamble.tex
+    colorlinks: true
+    highlight-style: github
+---
+
+## Motivation
+
+- Deep neural networks (DNNs) typically implicitly assume that observed responses are statistically independent. 
+
+- Real-world data, however, “include spatial, temporal and clustering structures.”
+
+
+In a typical LMM setting $y \in \mathbb{R}^n$ is a dependent variable modeled by $X$ and $Z$, which are $n \times p$ and $n \times q$ model matrices respectively
+
+$$
+y=X \beta+Z b+\varepsilon
+$$
+
+
+## Proposed method — LMMNN
+
+1. “We propose to use the mixed-models framework to handle correlated data in DNNs.” 
+
+$$
+y=f(X)+g(Z) b+\varepsilon
+$$
+
+2. “The key is using the Gaussian negative log-likelihood (NLL) as a natural loss function that is minimized with DNN machinery including stochastic gradient descent (SGD).”
+
+
+3. Mini-batch trick: “We calculate the inverse of the m × m sub-matrix Vξ … This ‘inversion in parts’ is the key element behind LMMNN’s scalability.”
+
+
+## Multiple categorical features
+
+논문에 있는 실제 데이터 중에서 InstEval를 사용 
+
+InstEval Description: 73K students 1-5 evaluations of professors from ETH Zurich
+
+| Dataset | $n$ | $K$ | $p$ | categorical | $q$ | $y$ |
+| :--- | :- | :- | :- | :--- | :- | :--- |
+| InstEval | 73 K | 3 | 3 | student teacher department | 2.9 K 1.1 K 14  | Teacher ratings (1-5) |
+
+data.head()
+
+$$
+\begin{tabular}{|l|l|l|l|l|l|l|l|}
+\hline & students & instructors & studage & lectage & service & departments & ratings \\
+\hline 0 & 0 & 524 & 2 & 2 & 0 & 1 & 5 \\
+\hline 1 & 0 & 559 & 2 & 1 & 1 & 5 & 2 \\
+\hline 2 & 0 & 831 & 2 & 2 & 0 & 1 & 5 \\
+\hline 3 & 0 & 1067 & 2 & 2 & 1 & 2 & 3 \\
+\hline 4 & 1 & 61 & 2 & 1 & 0 & 4 & 2 \\
+\hline
+\end{tabular}
+$$
+
+## 과정(Multiple categorical features 경우에는)
+
+1. 연속형 변수(고정효과)
+
+`add_layers_functional(X_input, n_neurons, dropout, activation)` 을 통해 
+
+3 → 10 → 3 → 1 구조의 MLP(Multi-Layer Perceptron)를 거쳐 $\hat{y}$ 을 만듦
+
+\vspace{4em}
+
+2. 범주형 변수(랜덤효과)
+
+- 선형인 경우
+
+Z를 One-hot 또는 Identity(그대로) 등을 반환해서 NLL(Negative Log-Likelihood)에 입력
+
+예) $y\sim N(f(X),\ g(Z)Dg(Z)^\top + \sigma^2_e I)$
+
+- 비선형인 경우
+
+Z를 임베딩,MLP로 바꾸는 변환의 경우는 g(Z) 변환해서 NLL(Negative Log-Likelihood)에 입력
+
+예) $y\ |\ b \sim N(f(X)+g(Z)b\ ,\ \sigma^2_e I)$
+
+## 
+
+3. NLL의 최적값 구하기
+
+$\sigma^2_e, \sigma^2_{b_k}$ 등 구해야 할 모수를 Adam 최적화 + EarlyStopping(개선이 이루어지지 않으면 멈춤)로 찾기
+
+4. BLUP(Best Linear Unbiased Predictor)계산
+
+$$
+\hat{b}=D(\hat{\psi}) \hat{g}\left(Z_{t r}\right)^{\prime} V(\hat{g}, \hat{\theta})^{-1}\left(y_{t r}-\hat{f}\left(X_{t r}\right)\right)
+$$
+
+5. 예측값 구하기
+
+`model.predict(...)`에서 반환하는 고정효과 $f(X)$
+
+선형 또는 비선형으로 구해진 $g(Z)$와 $\hat{b}$를 곱한것을 
+
+둘이 더해서 $y$의 예측값을 구한다.
+
+$$\hat{y} = \hat{f}(X) + \hat{g}(Z)\hat{b}$$
+
+6. MSE를 구한다.
+
+## 결과
+
+| exp_type | mean_mse | std_mse |
+| :--- | :--- | :--- |
+| embed | 1.5559 | 0.1148 |
+| ignore | 1.7774 | 0.0155 | 
+| lmm | 1.4757 | 0.0138 | 
+
+
+

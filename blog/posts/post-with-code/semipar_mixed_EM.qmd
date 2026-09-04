@@ -1,0 +1,183 @@
+---
+title: "semipar_mixed_EM"
+format: html
+date: "2025-09-05"
+categories: [LMM, Semiparametric]
+#image: "image.jpg"
+---
+
+논문 `Semiparametric multinomial mixed-effects models: A university students profiling tool`의 EM알고리즘을 이해해본다
+
+### 1. 모형 정의
+
+-   집단(군) $i=1, \ldots, I$, 각 집단의 관측 시점 $j=1, \ldots, n_i$.
+-   반응 $Y_{i j} \in\{1, \ldots, K\}$ (기준 범주 = 1 ).
+-   고정효과 공변량 $x_{i j} \in \mathbb{R}^p$, 랜덤효과 공변량 $z_{i j} \in \mathbb{R}^q$.
+
+baseline category ($\gamma = 1$)선형식은 다음과 같다
+
+$$
+\log \left(\frac{\pi_{i j \gamma}}{\pi_{i j 1}}\right) = \eta_{i j \gamma}=x_{i j}^{\top} \alpha_\gamma+z_{i j}^{\top} \delta_{i \gamma} \quad(\gamma=1, \ldots, K),
+$$
+
+$\gamma = 1$ 이 되면 $\eta_{i j 1} \equiv 0$이 되며 $Y_{ij}$가 $\gamma$카테고리가 되기 위한 확률은 다음과 같다.
+
+$$
+\operatorname{Pr}\left(Y_{i j}=\gamma\right)=\frac{\exp \left(\eta_{i j \gamma}\right)}{1+\sum_{\nu=2}^K \exp \left(\eta_{i j \nu}\right)} .
+$$
+
+### 2. 가능도 함수와 EM을 위한 완전자료 설정
+
+#### 2.1 질점(support points)
+
+질점은 다음과 같이 정의하며 반모수기법에 사용하는 방법이다.
+
+$$
+\mathbf{B}=\left\{\begin{array}{l}
+\left\{\begin{array}{l}
+\mathbf{b}_{12}, \mathbf{b}_{22}, \ldots, \mathbf{b}_{M_22}, \\
+\left(w_{12}\right),\left(w_{22}\right), \ldots,\left(w_{M_22}\right),
+\end{array}\right. \\
+\ldots \\
+\left\{\begin{array}{l}
+\mathbf{b}_{1 K}, \mathbf{b}_{2 K}, \ldots, \ldots, \mathbf{b}_{M_K K}, \\
+\left(w_{1 K}\right),\left(w_{2 K}\right), \ldots, \ldots,\left(w_{M_K K}\right) .
+\end{array}\right.
+\end{array}\right.
+$$
+
+관측가능도(집단 $i$ 의 전체 관측 $\mathbf{y}_i=\left\{Y_{i j}\right\}_{j=1}^{n_i}$ )
+
+범주 $k$ 의 질점 $b_{m_k k}$ 를 지정했을 때의 (조건)우도함수는 다음과 같다.
+
+$$
+\begin{gathered}
+p\left(\mathbf{y}_i \mid \alpha, b_{m_k k},\left\{\bar{b}_{\ell}\right\}_{\ell \neq k}\right)=\prod_{j=1}^{n_i} \prod_{\gamma=1}^K\left(\pi_{i j \gamma}\right)^{1\left\{Y_{i j}=\gamma\right\}},\quad \text{where }\ \bar{b}_{\ell}=\sum_{m_{\ell}=1}^{M_{\ell}} w_{m_{\ell} \ell} b_{m_{\ell} \ell}\\
+\pi_{i j \gamma}=\frac{\exp \left(\eta_{i j \gamma}\right)}{1+\sum_{\nu=2}^K \exp \left(\eta_{i j \nu}\right)}, \quad \eta_{i j \gamma}= \begin{cases}x_{i j}^{\top} \alpha_k+z_{i j}^{\top} b_{m_k k}, & \gamma=k \\
+x_{i j}^{\top} \alpha_\gamma+z_{i j}^{\top} \bar{b}_\gamma, & \gamma \neq k \end{cases}
+\end{gathered}
+$$
+
+여기서 $k$ 만 "혼합 성분"으로 움직이고 $\left(m_k=1, \ldots, M_k\right), \ell \neq k$ 는 평균 $\bar{b}_{\ell}$ 로 고정됩니다.
+
+#### 2.2 완전자료(잠재변수 latent variable 포함)
+
+-   잠재변수 $\delta_{i k} \in\left\{1, \ldots, M_k\right\}$ : 집단 $i$ 가 범주 $k$ 에서 선택한 질점(support point).
+
+$$
+\operatorname{Pr}\left(\delta_{i k}=m_k\right)=w_{m_k k}
+$$
+
+#### 2.3 완전자료 가능도함수
+
+잠재지표 $\delta_{i k} \in\left\{1, \ldots, M_k\right\}$ (집단 $i$ 가 범주 $k$ 에서 고른 질점)와 $\theta_k=\left(\alpha_k,\left\{b_{m_k k}\right\},\left\{w_{m_k k}\right\}\right)$ 에 대해,
+
+$$
+p\left(\mathbf{y}, \mathbf{\delta} \mid \theta_k\right)=\prod_{i=1}^I \prod_{m_k=1}^{M_k}\left(w_{m_k k} p\left(\mathbf{y}_i \mid \alpha_k, b_{m_k k},\left\{\bar{b}_{\ell}\right\}_{\ell \neq k}\right)\right)^{\mathbf{1}\left\{S_{i k}=m_k\right\}}
+$$
+
+-   지시함수로 **선택된 성분만 곱에 들어간다**를 표현
+
+-   즉, $i$번째 그룹이 $k$범주인데 그 $k$범주 안에서 우리가 모르는 변수인 잠재변수 $\delta_{i k}$가 $m_k$에 속하는 경우에만 곱해준다는 것을 의미한다.
+
+#### 2.4 완전자료 로그가능도
+
+-   완전자료 로그가능도 (범주 $k$ 만 놓고 보면)는 다음과 같이 쓸수 있다.
+
+$$
+\begin{gathered}
+\log p\left(\mathbf{y}, \mathbf{\delta} \mid \theta_k\right)=\sum_{i=1}^I \sum_{m_k=1}^{M_k} 1\left\{\delta_{i k}=m_k\right\}\left[\log w_{m_k k}+\log p\left(\mathbf{y}_i \mid \alpha_k, b_{m_k k},\left\{\bar{b}_{\ell}\right\}_{\ell \neq k}\right)\right], \\
+\theta_k=\left(\alpha_k,\left\{b_{m_k k}\right\}_{m_k=1}^{M_k},\left\{w_{m_k k}\right\}_{m_k=1}^{M_k}\right)
+\end{gathered}
+$$
+
+### 3. EM 시작
+
+#### 3.1 Q함수
+
+E-step에서 쓰일 Q함수부터 정의한다.
+
+여기서 잠재변수인 $\delta$의 주변화를 해주어야 한다.
+
+-   $\operatorname{Pr}\left(\delta_{i k}=m_k \mid \mathbf{y}_i, \theta_k^{\text {old }}\right) = W_{i m_k k}$ 라 정의하면 다음과 같이 Q함수를 쓸수 있다.
+
+$$
+Q\left(\theta_k \mid \theta_k^{\text {old }}\right)=\sum_{i=1}^I \sum_{m_k=1}^{M_k} \underbrace{W_{i m_k k}}_{\operatorname{Pr}\left(\delta_{i k}=m_k \mid \mathbf{y}_i ; \theta_k^{\text {old }}\right)}\left[\log w_{m_k k}+\log p\left(\mathbf{y}_i \mid \alpha_k, b_{m_k k},\left\{\bar{b}_{\ell}\right\}_{\ell \neq k}\right)\right]
+$$
+
+#### 3.2 E-step
+
+위 Q함수안에 $\delta$를 기댓값으로 계산해주기 위해선 $W_{i m_k k}$를 알아야 한다.
+
+다행히도 논문에 나와있는 수식으로 닫힌형태의 $\operatorname{Pr}\left(\delta_{i k}=m_k \mid \mathbf{y}_i ; \theta_k^{\text {old }}\right) = W_{i m_k k}$를 알수 있다.
+
+$$
+\begin{aligned}
+W_{i m_k k} & =\frac{w_{m_k k} \ p\left(\mathbf{y}_i \mid \boldsymbol{A}, \mathbf{b}_{m_k k}, \overline{\mathbf{b}}_{l \neq k}\right)}{\sum_{\gamma=1}^{M_k} w_{\gamma k} \ p\left(\mathbf{y}_i \mid \boldsymbol{A}, \mathbf{b}_{\gamma k}, \overline{\mathbf{b}}_{l \neq k}\right)} \\
+& =\frac{p\left(\boldsymbol{\delta}_{i k}=\mathbf{b}_{m_k k}\right) p\left(\mathbf{y}_i \mid \boldsymbol{A}, \mathbf{b}_{m_k k}, \overline{\mathbf{b}}_{l \neq k}\right)}{p\left(\mathbf{y}_i \mid \boldsymbol{A}\right)} \\
+& =\frac{p\left(\mathbf{y}_i, \boldsymbol{\delta}_{i k}=\mathbf{b}_{m_k k} \mid \boldsymbol{A}, \overline{\mathbf{b}}_{l \neq k}\right)}{p\left(\mathbf{y}_i \mid \boldsymbol{A}, \overline{\mathbf{b}}_{l \neq k}\right)} \\
+& =p\left(\boldsymbol{\delta}_{i k}=\mathbf{b}_{m_k k} \mid \mathbf{y}_i, \boldsymbol{A}, \overline{\mathbf{b}}_{l \neq k}\right) 
+\end{aligned}
+$$
+
+-   즉, $W_{i m_k k}$ 는 집단 $i$ 가 범주 $k$ 에서 $m_k$ 질점을 택했을 사후확률 이다
+
+-   식을 보다 자세히 표현하면 다음과 같다.
+
+$$
+W_{i m_k k}=\frac{w_{m_k k}^{o l d}\ p\left(\mathbf{y}_i \mid \alpha_k^{o l d}, b_{m_k k}^{o l d},\left\{\bar{b}_{\ell}^{o l d}\right\}_{\ell \neq k}\right)}{\sum_{\gamma=1}^{M_k} w_{\gamma k}^{o l d}\ p\left(\mathbf{y}_i \mid \alpha_k^{o l d}, b_{\gamma k}^{o l d},\left\{\bar{b}_{\ell}^{o l d}\right\}_{\ell \neq k}\right)}
+$$
+
+#### 3.3 M-step
+
+3가지의 부분을 다뤄야한다.
+
+##### 3.3.1 가중치 $w$
+
+다행히도 이 부분은 $\sum_{m_k} w_{m_k k}^{\text {new }}=1$ 라는 제약조건이 있기에 바로 다음과 같이 업데이트 할수 있다.
+
+증명방법은 다음과 같다.
+
+1.  제약조건인 $\sum_{m_k} w_{m_k k}=1$ 에 대해 라그랑지안을 보이면 다음과 같다.
+
+$$
+\mathcal{L}(w, \lambda)=\sum_{i=1}^I \sum_{m_k=1}^{M_k} W_{i m_k k} \log w_{m_k k}+\lambda\left(\sum_{m_k=1}^{M_k} w_{m_k k}-1\right)
+$$
+
+2.  미분한 1차 조건($w_{m_k k}>0$ )을 보이면 다음과 같다.
+
+$$
+\frac{\partial \mathcal{L}}{\partial w_{m_k k}}=\frac{\sum_{i=1}^I W_{i m_k k}}{w_{m_k k}}+\lambda=0 \quad \Longrightarrow \quad w_{m_k k}=-\frac{\sum_{i=1}^I W_{i m_k k}}{\lambda}
+$$
+
+3.  모든 $m_k$ 에 대해 합을 취하면 다음과 같다.
+
+$$
+\sum_{m_k=1}^{M_k} w_{m_k k}=-\frac{1}{\lambda} \sum_{m_k} \sum_i W_{i m_k k}=-\frac{1}{\lambda} \sum_i \underbrace{\sum_{m_k} W_{i m_k k}}_{=1}=-\frac{I}{\lambda}
+$$
+
+제약조건에 의해 $\sum_{m_k} w_{m_k k}=1$ 을 대입하면 $\lambda=-I$.
+
+따라서 다음과 같은 닫힌해를 구할수 있다.
+
+$$
+w_{m_k k}^{n e w}=\frac{1}{I} \sum_{i=1}^I W_{i m_k k}
+$$
+
+##### 3.3.2 질점 $b_{m_k k}$
+
+$k$범주의 질점만 찾는다고 하면 다음과 같이 구하면 된다
+
+다만, 이 경우에는 닫힌형태의 식이 존재하지 않는다.
+
+$$
+b_{m_k k}^{\text {new }}=\arg \max _{b \in \mathbb{R}^q} \sum_{i=1}^I W_{i m_k k} \log p\left(\mathbf{y}_i \mid \alpha_k^{\text {old }}, b,\left\{\hat{b}_{\ell}^{\text {old }}\right\}_{\ell \neq k}\right)
+$$
+
+##### 3.3.3 고정효과 $\alpha_k$
+
+$b_{m_k k}$와 마찬가지로 닫힌형이 없고 다음과 같이 $b_{m_k k}^{\text {new }}$를 받고 $\alpha_k^{\text {new }}$를 업데이트 해준다.
+
+$$
+\alpha_k^{\text {new }}=\arg \max _{\alpha_k} \sum_{m_k=1}^{M_k} \sum_{i=1}^I W_{i m_k k} \log p\left(\mathbf{y}_i \mid \alpha_k, b_{m_k k}^{\text {new }},\left\{\bar{b}_{\ell}^{\text {old }}\right\}_{\ell \neq k}\right)
+$$

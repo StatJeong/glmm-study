@@ -1,0 +1,281 @@
+---
+title: "Chapter 7 Exercise Review"
+date: "2025-03-21"
+categories: [study]
+---
+
+## 7.1
+
+**주어진 식을 갖고 식을 간편하게 줄여보아라**
+
+On assuming normality,
+
+$$
+\mathbf{y} \sim \mathcal{N}(\mathbf{X} \boldsymbol{\mu}, \mathbf{V})
+$$
+
+the ML estimator of $\boldsymbol{\mu}$ is $\left(\mathbf{X}^{\prime} \mathbf{V}^{-1} \mathbf{X}\right)^{-1} \mathbf{X}^{\prime} \mathbf{V}^{-1} \mathbf{y}$ from (6.19), whenever $\left(\mathbf{X}^{\prime} \mathbf{V}^{-1} \mathbf{X}\right)^{-1}$ exists. This gives
+
+$$
+\operatorname{ML}(\boldsymbol\mu)=\boldsymbol{\hat{\mu}}=\left[\left(\mathbf{1}_m^{\prime} \otimes \mathbf{I}_n\right)\left(\mathbf{I}_m \otimes \mathbf{V}_0^{-1}\right)\left( \mathbf{1}_m \otimes \mathbf{I}_n\right)\right]^{-1}\left(\mathbf{1}_m^{\prime} \otimes \mathbf{I}_n\right)\left(\mathbf{I}_m \otimes \mathbf{V}_0^{-1}\right) \mathbf{y}
+$$
+
+-   크로노커 곱을 먼저 보여보자.
+
+#### $\left(\mathbf{X}^{\prime} \mathbf{V}^{-1} \mathbf{X}\right)^{-1}$
+
+$$
+\begin{aligned}
+\left(\mathbf{X}^{\prime} \mathbf{V}^{-1} \mathbf{X}\right)^{-1} & = \left[\left(\mathbf{1}_m^{\prime} \otimes \mathbf{I}_n\right)\left(\mathbf{I}_m \otimes \mathbf{V}_0^{-1}\right)\left( \mathbf{1}_m \otimes \mathbf{I}_n\right)\right]^{-1}\\
+& = \left[\left[\begin{array}{cccc}
+\mathbf{I}_n & \mathbf{I}_n & \ldots & \mathbf{I}_n
+\end{array}\right]
+\left[\begin{array}{cccc}
+\mathbf{V}_0^{-1} & & & \\
+& \mathbf{V}_0^{-1} & & \\
+& & \ddots & \\
+& & & \mathbf{V}_0^{-1}
+\end{array}\right]
+\left[\begin{array}{c}
+\mathbf{I}_n \\
+\mathbf{I}_n \\
+\vdots \\
+\mathbf{I}_n
+\end{array}\right]\right]^{-1}\\
+& = \left[\left[\begin{array}{cccc}
+\mathbf{V}_0^{-1} & \mathbf{V}_0^{-1} & \ldots & \mathbf{V}_0^{-1}
+\end{array}\right]
+\left[\begin{array}{c}
+\mathbf{I}_n \\
+\mathbf{I}_n \\
+\vdots \\
+\mathbf{I}_n
+\end{array}\right]\right]^{-1}\\
+& = \left[m\mathbf{V}_0^{-1}\right]^{-1} \\
+& = \frac{1}{m}\mathbf{V}_0
+\end{aligned}
+$$
+
+#### $\mathbf{X}^{\prime} \mathbf{V}^{-1} \mathbf{y}$
+
+$$
+\begin{aligned}
+\mathbf{X}^{\prime} \mathbf{V}^{-1} \mathbf{y} & = \left(\mathbf{1}_m^{\prime} \otimes \mathbf{I}_n\right)\left(\mathbf{I}_m \otimes \mathbf{V}_0^{-1}\right) \mathbf{y}\\
+& = \left[\begin{array}{cccc}
+\mathbf{I}_n & \mathbf{I}_n & \ldots & \mathbf{I}_n
+\end{array}\right]
+\left[\begin{array}{cccc}
+\mathbf{V}_0^{-1} & & & \\
+& \mathbf{V}_0^{-1} & & \\
+& & \ddots & \\
+& & & \mathbf{V}_0^{-1}
+\end{array}\right]
+\left[\begin{array}{cccc}
+\mathbf{y}_1 \\
+\mathbf{y}_2 \\
+\vdots\\
+\mathbf{y}_m
+\end{array}\right]\\
+& = \left[\begin{array}{cccc}
+\mathbf{V}_0^{-1} & \mathbf{V}_0^{-1} & \ldots & \mathbf{V}_0^{-1}
+\end{array}\right]\left[\begin{array}{cccc}
+\mathbf{y}_{1} \\
+\mathbf{y}_{2} \\
+\vdots\\
+\mathbf{y}_{m}
+\end{array}\right]\\
+& = \mathbf{V}_0^{-1}\sum^m_i \mathbf{y}_{i}
+\end{aligned}
+$$
+
+#### 결론
+
+-   위 2개를 이용해 정리하자.
+
+$$
+\begin{aligned}
+\left(\mathbf{X}^{\prime} \mathbf{V}^{-1} \mathbf{X}\right)^{-1} \mathbf{X}^{\prime} \mathbf{V}^{-1} \mathbf{y} & = \frac{1}{m}\mathbf{V}_0 \mathbf{V}_0^{-1}\sum^m_i \mathbf{y}_{i} \\
+& = \frac{1}{m}\sum^m_i \mathbf{y}_{i} \\
+& = \bar{\mathbf{y}} \\
+& = \left\{{ }_c \bar{y}_{\cdot j}\right\}_{j=1}
+\end{aligned}
+$$
+
+## 7.2
+
+**If** $\mathbf{H}^{-1}$ exists and for $\mathbf{X}$ of full column rank, show that $\mathbf{V X}=\mathbf{X H}$ leads to $\left(\mathbf{X}^{\prime} \mathbf{V}^{-1} \mathbf{X}\right)^{-1} \mathbf{X}^{\prime} \mathbf{V}^{-1} \mathbf{y}=\left(\mathbf{X}^{\prime} \mathbf{X}\right)^{-1} \mathbf{X}^{\prime} \mathbf{y}$.
+
+-   주어진 식을 통해 $\mathbf{X}$와 $\mathbf{X}^\prime$의 형태를 유도해보자.
+
+$$
+\begin{aligned}
+\mathbf{V X} & =\mathbf{X H} \\ 
+\Leftrightarrow \ \mathbf{X} & = \mathbf{VXH^{-1}} \\
+\Leftrightarrow \ \mathbf{X}^\prime & = \mathbf{(H^{-1})^\prime\ X^\prime\ V^{\prime}} 
+\end{aligned}
+$$
+
+-   위에 유도한 $\mathbf{X}^\prime$ 걸 갖고 GLS추정량과 OLS추정량이 같은 걸 보여 보자.
+
+$$
+\begin{aligned}
+\left(\mathbf{X}^{\prime} \mathbf{V}^{-1} \mathbf{X}\right)^{-1} \mathbf{X}^{\prime} \mathbf{V}^{-1} \mathbf{y} 
+& = \left[\mathbf{(H^{-1})^\prime\ X^\prime V^{\prime}}\mathbf{V}^{-1}\mathbf{X}^{\prime}\right]^{-1}\mathbf{(H^{-1})^\prime\ X^\prime V^{\prime}} \mathbf{V}^{-1} \mathbf{y}\\
+& = \left[\mathbf{(H^{-1})^\prime\ X^\prime V}\ \mathbf{V}^{-1}\mathbf{X}^{\prime}\right]^{-1}\mathbf{(H^{-1})^\prime\ X^\prime V}\ \mathbf{V}^{-1} \mathbf{y}\\
+& = \left[\mathbf{(H^{-1})^\prime\ X^\prime\ }\mathbf{X}^{\prime}\right]^{-1}\mathbf{(H^{-1})^\prime\ X^\prime}\mathbf{y}\\
+& = \left(\mathbf{X^\prime\ }\mathbf{X}^{\prime}\right)^{-1}\left(\mathbf{(H^{-1})}^\prime\right)^{-1} \mathbf{(H^{-1})^\prime\ X^\prime}\mathbf{y}\\
+& = \left(\mathbf{X}^{\prime} \mathbf{X}\right)^{-1} \mathbf{X}^{\prime} \mathbf{y}\\
+\end{aligned}
+$$
+
+# Predicting random Effects
+
+## 7.3
+
+**In Section 7.4** $\mathrm{c}$ show that $\mathbf{A} \mathbf{A}^{-1}=\mathbf{I}$ and derive (7.27).
+
+### 1) $\mathbf{A} \mathbf{A}^{-1}=\mathbf{I}$
+
+Section 7.4의 c에 가보면
+
+$$
+\mathbf{A}=\left[\begin{array}{lllll}
+1 & \rho & \rho^2 & \rho^3 & \rho^4 \\
+\rho & 1 & \rho & \rho^2 & \rho^3 \\
+\rho^2 & \rho & 1 & \rho & \rho^2 \\
+\rho^3 & \rho^2 & \rho & 1 & \rho \\
+\rho^4 & \rho^3 & \rho^2 & \rho & 1
+\end{array}\right]
+$$
+
+$$
+\mathbf{A}^{-1}=\frac{1}{1-\rho^2}\left[\begin{array}{ccccc}
+1 & -\rho & 0 & 0 & 0 \\
+-\rho & 1+\rho^2 & -\rho & 0 & 0 \\
+0 & -\rho & 1+\rho^2 & -\rho & 0 \\
+0 & 0 & -\rho & 1+\rho^2 & -\rho \\
+0 & 0 & 0 & -\rho & 1
+\end{array}\right]
+$$
+
+-   직접 해보면 쉽게 $\mathbf{A} \mathbf{A}^{-1}=\mathbf{I}$가 된다는 것을 알수 있다.
+
+### 2) (7.27)
+
+-   주어진 식 (7.23)은 다음과 같다.
+
+$$
+\tilde{u}_i^0=\frac{\mathbf{1}^{\prime} \mathbf{R}_0^{-1}\left(\mathbf{y}_i-\hat{\boldsymbol{\beta}}\right)}{1 / \sigma_u^2+\mathbf{1}^{\prime} \mathbf{R}_0^{-1} \mathbf{1}} \quad \text { for } \quad \hat{\boldsymbol{\beta}}=\left\{_c \overline{\mathbf{y}}_{\cdot j}\right\} \quad \quad (7.23)
+$$
+
+-   또한 Section 7.4의 c의 상황은 **Uncorrelated between, and autocorrelated within, subjects** 이고, 1차 자기상관을 가진다고 한다.
+
+-   그렇다면, $\mathbf{R}_0 / \sigma^2$는 다음과 같은$AR(1)$ 자기상관 구조의 형태를 갖는다.
+
+$$
+\mathbf{R}_0 / \sigma^2=\left[\begin{array}{ccccc}
+1 & \rho & \rho^2 & \ldots & \rho^{n-1} \\
+\rho & 1 & \rho & \ldots & \rho^{n-2} \\
+\rho^2 & \rho & 1 & \ldots & \rho^{n-3} \\
+\vdots & \vdots & \vdots & \ddots & \vdots \\
+\rho^{n-1} & \rho^{n-2} & \rho^{n-3} & \ldots & 1
+\end{array}\right]
+$$
+
+$$
+\mathbf{R}_0^{-1}=\frac{1}{\sigma^2\left(1-\rho^2\right)}\left[\begin{array}{ccccc}
+1 & -\rho & 0 & \cdots & 0 \\
+-\rho & 1+\rho^2 & -\rho & \cdots & 0 \\
+0 & -\rho & 1+\rho^2 & \cdots & 0 \\
+\vdots & \vdots & \vdots & \ddots & -\rho \\
+0 & 0 & 0 & -\rho & 1
+\end{array}\right]
+$$
+
+-   그럼, 분자 분모를 각각 보면서 정리를 해나가보자.
+
+#### 분자 $\mathbf{1}^{\prime} \mathbf{R}_0^{-1}\left(\mathbf{y}_i-\hat{\boldsymbol{\beta}}\right)$
+
+-   $\mathbf{1}^{\prime} \mathbf{R}_0^{-1}$ 부분부터 보자.
+
+$$
+\begin{aligned}
+\mathbf{1}^{\prime} \mathbf{R}_0^{-1} & = 
+\left[\begin{array}{cccc} 
+1 & 1 & 1 & \ldots & 1 
+\end{array}\right] 
+\frac{1}{\sigma^2\left(1-\rho^2\right)}\left[\begin{array}{ccccc}
+1 & -\rho & 0 & \cdots & 0 \\
+-\rho & 1+\rho^2 & -\rho & \cdots & 0 \\
+0 & -\rho & 1+\rho^2 & \cdots & 0 \\
+\vdots & \vdots & \vdots & \ddots & -\rho \\
+0 & 0 & 0 & -\rho & 1
+\end{array}\right]\\
+& = \frac{1}{\sigma^2\left(1-\rho^2\right)} \left[\begin{array}{cccc} 
+1-\rho & 1-2\rho+\rho^2 & 1-2\rho+\rho^2 & \ldots & 1-2\rho+\rho^2 & 1-\rho 
+\end{array}\right]\\
+& = \frac{1}{\sigma^2\left(1-\rho^2\right)} \left[\begin{array}{cccc} 
+1-\rho & (1-\rho)^2 & (1-\rho)^2 & \ldots & (1-\rho)^2 & 1-\rho 
+\end{array}\right]
+\end{aligned}
+$$
+
+-   이제 $\mathbf{1}^{\prime} \mathbf{R}_0^{-1}\left(\mathbf{y}_i-\hat{\boldsymbol{\beta}}\right)$을 보자.
+
+$$
+\begin{aligned}
+\mathbf{1}^{\prime} \mathbf{R}_0^{-1}\left(\mathbf{y}_i-\hat{\boldsymbol{\beta}}\right) & = \frac{1}{\sigma^2\left(1-\rho^2\right)} \left[\begin{array}{cccc} 
+1-\rho & (1-\rho)^2 & \ldots & (1-\rho)^2 & 1-\rho 
+\end{array}\right]\left[\begin{array}{c}
+y_{i 1}-\bar{y}_{.1} \\
+y_{i 2}-\bar{y}_{.2} \\
+\vdots \\
+y_{i n}-\bar{y}_{.n}
+\end{array}\right] \\
+& = \frac{1}{\sigma^2\left(1-\rho^2\right)}\left[(1-\rho)\left[\left(y_{i 1}-\bar{y}_{\cdot 1}\right)+\left(y_{i n}-\bar{y}_{\cdot n}\right)\right]+(1-\rho)^2 \sum_{k=2}^{n-1}\left(y_{i k}-\bar{y}_{\cdot k}\right)\right]
+\end{aligned}
+$$
+
+#### 분모 $1 / \sigma_u^2+\mathbf{1}^{\prime} \mathbf{R}_0^{-1} \mathbf{1}$
+
+-   $\mathbf{1}^{\prime} \mathbf{R}_0^{-1} \mathbf{1}$을 확인해보자.
+
+$$
+\begin{aligned}
+\mathbf{1}^{\prime} \mathbf{R}_0^{-1} \mathbf{1} & = \frac{1}{\sigma^2\left(1-\rho^2\right)} \left[\begin{array}{cccc} 
+1-\rho & (1-\rho)^2 & \ldots & (1-\rho)^2 & 1-\rho 
+\end{array}\right]\left[\begin{array}{c}
+1 \\
+1 \\
+\vdots \\
+1 \\
+1
+\end{array}\right]\\
+& = \frac{1}{\sigma^2\left(1-\rho^2\right)}\left[(n-2)(1-\rho)^2 + 2(1-\rho)\right]\\
+& = \frac{1}{\sigma^2\left(1+\rho\right)}\left[(n-2)(1-\rho)+2\right]
+\end{aligned}
+$$
+
+#### 최종정리
+
+$$
+\begin{aligned}
+\tilde{u}_i^0 & =\frac{\mathbf{1}^{\prime} \mathbf{R}_0^{-1}\left(\mathbf{y}_i-\hat{\boldsymbol{\beta}}\right)}{1 / \sigma_u^2+\mathbf{1}^{\prime} \mathbf{R}_0^{-1} \mathbf{1}}\\
+& = \frac{\frac{1}{\sigma^2\left(1+\rho\right)}\left[\left(y_{i 1}-\bar{y}_{\cdot 1}\right)+\left(y_{i n}-\bar{y}_{\cdot n}\right)+(1-\rho) \sum_{k=2}^{n-1}\left(y_{i k}-\bar{y}_{\cdot k}\right)\right]}{\frac{1}{\sigma^2_u}+\frac{1}{\sigma^2\left(1+\rho\right)}\left[(n-2)(1-\rho)+2\right]} \times \frac{\sigma^2_u\ \sigma^2(1+\rho)}{\sigma^2_u\ \sigma^2(1+\rho)}\\
+& = \frac{\sigma^2_u\left[\left(y_{i 1}-\bar{y}_{\cdot 1}\right)+\left(y_{i n}-\bar{y}_{\cdot n}\right)+(1-\rho) \sum_{k=2}^{n-1}\left(y_{i k}-\bar{y}_{\cdot k}\right)\right]}{\sigma^2(1+\rho) + \sigma^2_u\left[n-(n-2)\rho\right]}\\
+& = \frac{\sigma^2_u\left[n\left(\bar{y}_{i.}-\bar{y}_{..}\right)-\rho \sum_{k=2}^{n-1}\left(y_{i k}-\bar{y}_{\cdot k}\right)\right]}{\sigma^2(1+\rho) + \sigma^2_u\left[n-(n-2)\rho\right]}\\
+\\
+&  \text{분자에서 } n\left(\bar{y}_{i.}-\bar{y}_{..}\right) = (1-\rho)\ n\left(\bar{y}_{i.}-\bar{y}_{..}\right) + \rho \ n\left(\bar{y}_{i.}-\bar{y}_{..}\right)\\
+\\
+& = \frac{\sigma^2_u\left[(1-\rho)\ n\left(\bar{y}_{i.}-\bar{y}_{..}\right) + \rho \ n\left(\bar{y}_{i.}-\bar{y}_{..}\right)-\rho \sum_{k=2}^{n-1}\left(y_{i k}-\bar{y}_{\cdot k}\right)\right]}{\sigma^2(1+\rho) + \sigma^2_u\left[n-(n-2)\rho\right]}\\
+& = \frac{\sigma^2_u\left[(1-\rho)\ n\left(\bar{y}_{i.}-\bar{y}_{..}\right) + \rho \left(y_{i1}-\bar{y}_{.1}+y_{in}-\bar{y}_{.n}\right)\right]}{\sigma^2(1+\rho) + \sigma^2_u\left[n-(n-2)\rho\right]}\\
+\end{aligned}
+$$
+
+## 7.4
+
+**In Section 7.5 b confirm the final form of** $\operatorname{LHS}\left(\sigma_u^2\right)$ and $\operatorname{RHS}\left(\sigma_u^2\right)$. Also, verify the simplification of (7.38) to (7.39).
+
+## 7.5
+
+## 7.6

@@ -1,0 +1,480 @@
+---
+title: "Chapter 6 Exercise Review"
+date: "2025-03-14"
+categories: [study]
+---
+
+## 6.1
+
+**식(6.2),(6.3),(1.14)를 사용해 (6.6)을 보여라**
+
+-   $\mathbf{y}$의 분산을 정리하면 된다.
+
+$$
+\begin{aligned}
+\sigma_y^2 & =\operatorname{var}\left(y_{i j}\right)=\operatorname{var}\left(\mathrm{E}\left[y_{i j} \mid a_i\right]\right)+\mathrm{E}\left[\operatorname{var}\left(y_{i j} \mid a_i\right)\right] \quad \quad & (1.14)\\
+\mathrm{E}[\mathbf{y} \mid \mathbf{u}] & =\mathbf{X} \boldsymbol{\beta}+\mathbf{Z} \mathbf{u} & (6.2) \\
+\mathbf{u} & \sim(\mathbf{0}, \mathbf{D}), \text { meaning that } \mathrm{E}[\mathbf{u}]=\mathbf{0} \text { and } \operatorname{var}(\mathbf{u})=\mathbf{D} & (6.3)
+\end{aligned}
+$$
+
+-   위 식 정리를 사용하면 간단하다.
+
+$$
+\begin{aligned}
+\operatorname{var}(\mathbf{y}) & = \operatorname{var}(\mathrm{E}[\mathbf{y} \mid \mathbf{u}]) + \mathrm{E}(\operatorname{var}[\mathbf{y} \mid \mathbf{u}]) \\
+& = \operatorname{var}(\mathbf{X} \boldsymbol{\beta}+\mathbf{Z} \mathbf{u}) + \mathrm{E}(\mathbf{R}) \\
+& = \mathbf{Z D} \mathbf{Z}^{\prime}+\mathbf{R}
+\end{aligned}
+$$
+
+## 6.2
+
+### (a)
+
+$V^{-1}:= L^{\top}L$ 에서 $L$이 non-singular일까
+
+왜 Cholesky 분해가 가능한지를 묻는 다면, 선대 설명을 깊게 가야 하는지
+
+아니면 Cholesky 분해를 통해서 얻고자 하는 게 무엇인지를 말한다면 다음에 하겠음.
+
+### (b)
+
+**(a)의 결과를 이용해서, 어떤 일반화 역행렬을 사용하던 간에** $\mathbf{X} \boldsymbol{\beta}^0$가 변하지 않는 걸 보여라
+
+$$
+\begin{aligned}
+X \beta^0 & =X\left(X^{\top} V^{-1} X\right)^{-} X^{\top} V^{-1} y\\
+& = X(X^{\top} L^{\top}L X)^{-}X^{\top}L^{\top}L y \quad \quad \because V^{-1}:= L^{\top}L \\
+& =\left(L^{-1} Z\right)\left[\left(Z^{\top} Z\right)^{-} Z^{\top} w\right] \\
+& \quad \quad \because Z=L X,\quad X=L^{-1} Z,\quad w=L y \\
+& = L^{-1} \underbrace{Z\left(Z^{\top} Z\right)^{-} Z^{\top}}_{P_Z} w .
+\end{aligned}
+$$
+
+-   일반화 역행렬이 어떻게 선택되더라도 이 사영행렬식은 유일하다.
+
+-   이 사영행렬이 멱등(idempotent)행렬이기도 하므로 그러면, 여러번 이 행렬을 곱해도 동일한 행렬을 가지므로 $P_z$행렬이 사영행렬인 것을 알 수 있다.
+
+## 6.3
+
+**선형모형** $\mathrm{E}[\mathbf{y}]=\mathbf{X} \boldsymbol{\beta}$에서 $\mathbf{X}$가 full column rank 일 때 임의의 선형결합 $c^{\top} \beta$ 가 모두 추정가능함을 보이라
+
+#### 먼저
+
+중요하게 봐야할 부분은
+
+-   선형모형에서 " $c^{\top} \beta$ 가 추정가능하다"는 말은, 어떤 벡터 $a \in \mathbb{R}^n$ 가 존재해서 다음과 같이 성립한다는 것을 의미한다.
+
+$$
+c^{\top} \beta=a^{\top} \mathrm{E}[y]
+$$
+
+-   즉, $c^{\top}$ 가 $X$ 의 행공간(row space) 안에 있어야 한다.
+
+이유는 임의의 선형결합 $c$라면 그것을 $\mathbf{X}$가 다 다룰 수 있어야 하기 때문이다.
+
+#### 다음
+
+-   $X$ 가 $n \times p$ 이고, full column $\operatorname{rank}$ 라면 $\operatorname{rank}(X)=p$.
+
+-   이는 곧 $X$ 의 **열공간(column space)**가 $\mathbb{R}^n$ 에서 차원 $p$ 를 차지하고, **행공간(row space)**도 $\mathbb{R}^p$ 에서 차원 $p$ 를 갖는다.
+
+-   결국 $X$ 의 row space가 $\mathbb{R}^p$ 전체가 된다.
+
+즉, $\forall c^{\top} \in \mathbb{R}^p$ 에 대해 $c^{\top}$ 는 row space 안에 있다.
+
+#### 결론
+
+-   임의의 $c \in \mathbb{R}^p$ 에 대해 $c^{\top}$ 가 row space에 들어가므로, 어떤 $a \in \mathbb{R}^n$ 가 존재해서 다음과 같이 성립이된다.
+
+$$
+a^{\top} X=c^{\top}
+$$
+
+-   따라서
+
+$$
+a^{\top} y=a^{\top} X \beta=c^{\top} \beta .
+$$
+
+이 말은 ${ }^~ c^{\top} \beta$ 가 $a^{\top} y$ 라는 (관측자료 $y$ 의) 선형결합으로 표현되므로, 통계적으로 추정 가능(estimatble)"함을 의미한다.
+
+## 6.4
+
+모형 가정
+
+-   $\mathrm{E}[y]=X \beta, \quad \operatorname{Var}(y)=V, \quad V$ 는 이미 알려져 있고, 가역 (invertible)이라 가정.
+
+-   $\beta$ 는 $p$-차원, $X$ 는 $n \times p$ 행렬.
+
+### 1
+
+**추정가능(estimatble)한 선형함수** $c^{\top} \beta$ 의 MLE가 $c^{\top}\left(X^{\top} V^{-1} X\right)^{-} X^{\top} V^{-1} y$와 같음을 보이라.
+
+-   " $c^{\top} \beta$ 가 추정가능"이라 함은, 어떤 $a \in \mathbb{R}^n$ 가 존재해서 다음과 같이 되고, $a^{\top} y$ 로 표현할 수 있다는 뜻이다.
+
+$$
+c^{\top} \beta=a^{\top} X \beta \quad\left(\therefore a^{\top} X=c^{\top}\right),
+$$
+
+-   이제 $c^{\top}=a^{\top} X$ 라는 점을 이용하면,
+
+$$
+c^{\top} \hat{\beta}_{\mathrm{ML}}=\underbrace{a^{\top} X}_{c^{\top}}\left(X^{\top} V^{-1} X\right)^{-} X^{\top} V^{-1} y=a^{\top}\left[X\left(X^{\top} V^{-1} X\right)^{-} X^{\top}\right] V^{-1} y .
+$$
+
+-   그렿지만 핵심은 다음과 같다.
+
+$$
+c^{\top} \hat{\beta}_{\mathrm{ML}}=c^{\top}\left(X^{\top} V^{-1} X\right)^{-} X^{\top} V^{-1} y
+$$
+
+### 2.
+
+**"왜** $\mathbf{V}$ 가 invertible하다고 보는 건 합리적이지만, $\left(\mathbf{X}^{\top} \mathbf{V}^{-1} \mathbf{X}\right)$ 가 invertible하다고는 보기 어렵나?"
+
+-   $\mathbf{V}$는 공분산행렬이기에 최소한 positive semi-definite을 만족해야 하기에 역행렬이 존재한다.
+
+-   반면, $\mathbf{X}^{\top} \mathbf{V}^{-1} \mathbf{X}$은 $\mathbf{X}$때문에 역행렬이 없을 수 있다.
+
+$\mathbf{X}$가 full column rank이어야 하는데 그렇지 않거나 다중공선성이기에 그런 경우가 많다.
+
+## 6.5
+
+-   Balanced one-way random model:
+
+$$
+\begin{aligned}
+y_{i j} \mid a_i & \sim \text { indep. } \mathcal{N}\left(\mu+a_i, \sigma^2\right) ,\ i=1,2, \ldots, m ,\ j=1,2, \ldots, n \\
+a_i & \sim \text { i.i.d. } \mathcal{N}\left(0, \sigma_a^2\right)
+\end{aligned}
+$$
+
+**내적상관계수(ICC)에 대한 (1–**$\alpha$)·100% 신뢰구간을 구하라
+
+-   해당 모형에서 내적상관계수(ICC)는 다음과 같다.
+
+$$
+\rho=\frac{\sigma_a^2}{\sigma_a^2+\sigma^2}
+$$
+
+#### 추정량
+
+-   2개의 분산추정량을 구한다.
+
+$$
+\hat{\sigma}_a^2=\frac{\mathrm{MSA}-\mathrm{MSE}}{n}, \quad \hat{\sigma}^2=\mathrm{MSE} .
+$$
+
+-   ICC에 대입해보자.
+
+$$
+\hat{\rho}=\frac{\hat{\sigma}_a^2}{\hat{\sigma}_a^2+\hat{\sigma}^2}=\frac{\frac{\text {MSA} - \text{MSE}}{n}}{\frac{\text {MSA} - \text{MSE}}{n}+\text{MSE}} = \frac{\mathrm{MSA}-\mathrm{MSE}}{\mathrm{MSA}+(n-1) \mathrm{MSE}}
+$$
+
+#### 신뢰구간
+
+F분포를 이용해서 신뢰구간을 구해보자.
+
+##### ANOVA
+
+-   ANOVA에서 결과를 가져온다.
+
+$$
+\mathrm{E}[\mathrm{MSA}]=\sigma^2+n \sigma_a^2, \quad \mathrm{E}[\mathrm{MSE}]=\sigma^2 .
+$$
+
+-   따라서
+
+$$
+F=\frac{\mathrm{MSA}}{\mathrm{MSE}} \quad \Rightarrow \quad \mathrm{E}[F]=1+n \frac{\sigma_a^2}{\sigma^2} \text {. }
+$$
+
+##### F-분포
+
+-   ICC $\rho$ 를 구하려면 $\theta=\sigma_a^2 / \sigma^2$ 가 필요하고,
+
+$$
+F=\frac{\mathrm{MSA}}{\mathrm{MSE}} \approx 1+n \theta
+$$
+
+-   또한 $F$ 는 자유도 $\mathrm{df}_1=m-1, \mathrm{df}_2=m(n-1)$ 의 분포(또는 근사)를 따른다고 봄.
+
+##### $\theta$ 에 대한 신뢰구간
+
+-   실제 관측값 $f_{\mathrm{obs}}=\frac{\mathrm{MSA}}{\mathrm{MSE}}$.
+
+-   $100(1-\mathrm{a}) \%$ 신뢰구간을 F -분포 역함수로부터 구하면
+
+$$
+\frac{f_{\text {obs }}}{F_{(1-\alpha / 2 ; m-1, m(n-1))}} \leq \mathrm{E}[F] \leq \frac{f_{\text {obs }}}{F_{(\alpha / 2 ; m-1, m(n-1))}}
+$$
+
+-   그 뒤 $\mathrm{E}[F]=1+n \theta$ 관계를 사용하여 $\theta$ 의 신뢰구간으로 변환:
+
+$$
+\hat{\theta}_L=\frac{\mathrm{E}[F]_L-1}{n}, \quad \hat{\theta}_U=\frac{\mathrm{E}[F]_U-1}{n}
+$$
+
+##### $\operatorname{ICC}=\frac{\theta}{1+\theta}$
+
+-   마지막으로 $\rho=\frac{\theta}{1+\theta}$.
+
+-   구한 $\hat{\theta}_L, \hat{\theta}_U$ 에 대해
+
+$$
+\rho_L=\frac{\hat{\theta}_L}{1+\hat{\theta}_L}, \quad \rho_U=\frac{\hat{\theta}_U}{1+\hat{\theta}_U} .
+$$
+
+-   이렇게 하면 $\rho$ 의 $(1-\mathrm{a}) \cdot 100 \%$ 근사 신뢰구간 $\left(\rho_L, \rho_U\right)$ 를 얻는다.
+
+## 6.6
+
+**각 문제의 모형을 행렬표기로 쓰고, 그에 따른 주변분포의 평균과 분산을 구하라**
+
+### (a)
+
+$y_{i j} \mid a_i \sim$ indep. $\mathcal{N}\left(\mu+a_i+\beta_j, \sigma^2\right)$ ;
+
+$a_i \sim$ i.i.d. $\mathcal{N}\left(0, \sigma_a^2\right)$ $i=1,2, \ldots, m ; j=1,2, \ldots, n$.
+
+**(Two-way mixed).**
+
+-   $i$요인은 랜덤효과 $j$요인은 고정효과이다.
+
+#### 행렬표현
+
+보통 $\mathbf{y}$를 길이 $mn$ 인 벡터로 만들고, " $X \beta$ "는 고정효과 부분, " $Z a^{\prime}$ 는 랜덤효과 부분, " $\varepsilon$ "는 오차로 나타낸다:
+
+$$
+\begin{aligned}
+\mathbf{y}& =\mathbf{X} \boldsymbol{\beta}+\mathbf{Z} \mathbf{a}+\varepsilon,\\
+& \text{where},\\
+& \mathbf{a}=\left(a_1, \ldots, a_m\right)^{\top} \in \mathbb{R}^m, \mathbf{a} \sim N\left(\mathbf{0}, \sigma_a^2 I_m\right)\\
+& \varepsilon \sim N\left(\mathbf{0}, \sigma^2 I_{m n}\right)\\
+& X: \scriptsize\text{고정효과에 대한 설계행렬} (m n \times 2)\\
+& Z: (m n \times m)\scriptsize\text{행렬: 관측 (i, j) 에 해당하는 행에서 Z 의 i-번째 열만 1 , 나머지 0.}
+\end{aligned}
+$$
+
+-   $Z$ 는 랜덤효과 $\left(a_i\right)$ 에 대한 설계행렬 $(m n \times m)$. 예컨대, 관측 $(i, j)$ 에 해당하는 행에서 $Z$ 의 $i$-번째 열만 1 , 나머지 0 .
+
+#### $y$의 주변분포
+
+##### 평균
+
+$$
+\mathrm{E}[\mathbf{y}]=\mathrm{E}[X \boldsymbol{\beta}+Z \mathbf{a}+\boldsymbol{\varepsilon}]=X \boldsymbol{\beta},
+$$
+
+##### 분산
+
+$$
+\begin{aligned}
+\operatorname{Var}(\mathbf{y})& =\operatorname{Var}(Z \mathbf{a}+\boldsymbol{\varepsilon})\\
+& =Z \operatorname{Var}(\mathbf{a}) Z^{\top}+\operatorname{Var}(\varepsilon)\\
+& =Z\left(\sigma_a^2 I_m\right) Z^{\top}+\sigma^2 I_{m n}\\
+\text{where}&,\\
+& \operatorname{Var}\left(y_{i j}\right)=\sigma_a^2+\sigma^2\\
+& \operatorname{Cov}\left(y_{i j}, y_{i j^{\prime}}\right)=\sigma_a^2\left(j \neq j^{\prime}\right)\\
+& \operatorname{Cov}\left(y_{i j}, y_{i^{\prime} j^{\prime}}\right)=0\left(i \neq i^{\prime}\right)\\
+\end{aligned}
+$$
+
+### (b)
+
+$y_{i j} \mid a_i, b_j \sim \operatorname{indep.} \mathcal{N}\left(\mu+a_i+b_j, \sigma_a^2\right)$;
+
+$a_i \sim$ i.i.d. $\mathcal{N}\left(0, \sigma_a^2\right) ;$
+
+$b_j \sim$ i.i.d. $\mathcal{N}\left(0, \sigma_b^2\right) ;$
+
+$a_i$ and $b_j$ indep. ; $i=1,2, \ldots, m$; $j=1,2, \ldots, n$.
+
+**(Two-way random).**
+
+#### 행렬표현
+
+$$
+\begin{aligned}
+\mathbf{y} & =X \boldsymbol{\beta}+Z_1 \mathbf{a}+Z_2 \mathbf{b}+\boldsymbol{\epsilon} .\\
+& \text{where},\\
+& \mathbf{a}=\left(a_1, \ldots, a_m\right)^{\top} \in \mathbb{R}^m, \mathbf{a} \sim N\left(\mathbf{0}, \sigma_a^2 I_m\right)\\
+& \mathbf{b}=\left(b_1, \ldots, b_m\right)^{\top} \in \mathbb{R}^m, \mathbf{b} \sim N\left(\mathbf{0}, \sigma_b^2 I_m\right)\\
+& Z_1: (m n \times m) \scriptsize\text{행렬: 관측 (i, j) 에 해당하는 행에서 i-번째 열만 1 , 나머지 0 .}\\
+& Z_2: (m n \times n) \scriptsize\text{행렬: 관측 (i, j) 에 해당하는 행에서 j-번째 열만 1, 나머지 0 .}\\
+& X: (m n \times 1) \scriptsize\text{행렬: 모든 행이 1}.\\
+\end{aligned}
+$$
+
+#### $y$의 주변분포
+
+##### 평균
+
+-   $\mathrm{E}[\mathbf{a}]=\mathbf{0}, \mathrm{E}[\mathbf{b}]=\mathbf{0}, \mathrm{E}[\boldsymbol{\epsilon}]=\mathbf{0}$이므로, 따라서
+
+$$
+\mathrm{E}[\mathbf{y}]=X \boldsymbol{\beta}
+$$
+
+-   즉, 각 관측 $y_{i j}$ 에 대한 한계평균은
+
+$$
+\mathrm{E}\left[y_{i j}\right]=\mu
+$$
+
+##### 분산
+
+-   오차항과 랜덤효과들이 서로 독립이므로,
+
+$$
+\begin{aligned}
+\operatorname{Var}(\mathbf{y})& =Z_1 \operatorname{Var}(\mathbf{a}) Z_1^{\top}+Z_2 \operatorname{Var}(\mathbf{b}) Z_2^{\top}+\operatorname{Var}(\boldsymbol{\epsilon}) .\\
+& = Z_1\left(\sigma_a^2 I_m\right) Z_1^{\top}+Z_2\left(\sigma_b^2 I_n\right) Z_2^{\top}+\sigma^2 I_{m n} .\\
+\text{where},& \\
+& \operatorname{Var}\left(y_{i j}\right)=\sigma_a^2+\sigma_b^2+\sigma^2\\
+& \operatorname{Cov}\left(y_{i j}, y_{i^{\prime} j^{\prime}}\right)=\sigma_a^2\ \text{ if }\ i=i^{\prime}\ \text{ but }\ j \neq j^{\prime}\\
+& \operatorname{Cov}\left(y_{i j}, y_{i^{\prime} j^{\prime}}\right)=\sigma_b^2\ \text{ if }\ j=j^{\prime}\ \text{ but }\ i \neq i^{\prime}\\
+\end{aligned}
+$$
+
+### (c)
+
+$y_{i j k} \mid a_i, g_{i j} \sim \operatorname{indep.} \mathcal{N}\left(\mu+a_i+\beta_j+g_{i j}, \sigma^2\right) ;$
+
+$a_i \sim$ i.i.d. $\mathcal{N}\left(0, \sigma_a^2\right) ;$
+
+$g_{i j} \sim$ i.i.d. $\mathcal{N}\left(0, \sigma_g^2\right) ;$
+
+$a_i$ and $g_{i j}$ indep.; $i=1,2, \ldots, m$; $j=1,2, \ldots, n ; k=1,2, \ldots, r$.
+
+**(Two-way mixed with interaction).**
+
+#### 행렬표현
+
+$$
+\begin{aligned}
+\mathbf{y} & =X \boldsymbol{\beta}+Z_1 \mathbf{a}+Z_2 \mathbf{b}+\boldsymbol{\epsilon} .\\
+& \text{where},\\
+& \mathbf{a}=\left(a_1, \ldots, a_m\right)^{\top} \in \mathbb{R}^m, \mathbf{a} \sim N\left(\mathbf{0}, \sigma_a^2 I_m\right)\\
+& \mathbf{g}=\left(g_{11},g_{12}, \ldots, g_{mn}\right)^{\top} \in \mathbb{R}^m, \mathbf{g} \sim N\left(\mathbf{0}, \sigma_g^2 I_{mn}\right)\\
+& Z_1: (m n \times m) \scriptsize\text{행렬: 관측 (i, j) 에 해당하는 행에서 i-번째 열만 1 , 나머지 0 .}\\
+& Z_2: (m n \times mn) \scriptsize\text{행렬: 관측 (i, j) 에 해당하는 행에서 (i,j)-번째 열만 1, 나머지 0 .}\\
+& X: (m n \times 2) \scriptsize\text{행렬: 고정효과를 위한 설계행렬}.\\
+\end{aligned}
+$$
+
+#### $y$의 주변분포
+
+##### 평균
+
+-   $\mathrm{E}[\mathbf{a}]=\mathbf{0}, \mathrm{E}[\mathbf{g}]=\mathbf{0}, \mathrm{E}[\boldsymbol{\epsilon}]=\mathbf{0}$이므로, 따라서
+
+$$
+\mathrm{E}[\mathbf{y}]=X \boldsymbol{\beta}
+$$
+
+-   즉, 각 관측 $y_{i j}$ 에 대한 한계평균은
+
+$$
+\mathrm{E}\left[y_{i j}\right]=\mu + \beta_j
+$$
+
+##### 분산
+
+-   오차항과 랜덤효과들이 서로 독립이므로,
+
+$$
+\begin{aligned}
+\operatorname{Var}(\mathbf{y})& =Z_1 \operatorname{Var}(\mathbf{a}) Z_1^{\top}+Z_2 \operatorname{Var}(\mathbf{g}) Z_2^{\top}+\operatorname{Var}(\boldsymbol{\epsilon}) .\\
+& = Z_1\left(\sigma_a^2 I_m\right) Z_1^{\top}+Z_2\left(\sigma_g^2 I_{mn}\right) Z_2^{\top}+\sigma^2 I_{m n} .\\
+\text{where},& \\
+& \operatorname{Var}\left(y_{i j}\right)=\sigma_a^2+\sigma_g^2+\sigma^2\\
+& \operatorname{Cov}\left(y_{i j}, y_{i^{\prime} j^{\prime}}\right)=\sigma_a^2\ \text{ if }\ i=i^{\prime}\ \text{ but }\ j \neq j^{\prime}\\
+& \operatorname{Cov}\left(y_{i j}, y_{i^{\prime} j^{\prime}}\right)=\sigma_g^2\ \text{ if }\ i=i^{\prime}\text{ and }\ j=j^{\prime}\ \\
+\end{aligned}
+$$
+
+## 6.7
+
+-   Unbalanced one-way random model:
+
+$$
+\begin{aligned}
+y_{i j} \mid a_i & \sim \text { indep. } \mathcal{N}\left(\mu+a_i, \sigma^2\right) ,\ i=1,2, \ldots, m ,\ j=1,2, \ldots, n_i \\
+a_i & \sim \text { i.i.d. } \mathcal{N}\left(0, \sigma_a^2\right)
+\end{aligned}
+$$
+
+**랜덤효과의 분산** $\sigma_a^2$의 추정량으로 부터 UMVUE가 존재하지 않는 걸 설명해라.
+
+말로만 설명을 하자면 3장 연습문제에서 계속 다뤘던 balanced data와 unbalanced data의 랜덤효과의 분산추정량을 구했었는데 그 2개의 추정량이 이 문제의 포커스라 생각하면 된다.
+
+즉, 2개의 분산추정량이 생긴다. 그리고 둘다 불편추정량이고 충분통계량도 동일하게 갖고 있다.
+
+하지만, 추정량에 문제가 있는데 그 안에 $V$를 알고 계산을 하지만 실제로 우리는 모른다.
+
+그렇기에 UMVUE가 존재하지 않는다.
+
+## 6.8 (미완성)
+
+### (a)
+
+**6.9절에 있는** $K^{\top}y$(즉, REML의 고정효과를 제거하기 위한 $K$를 사용한 변환)을 이용한 로그가능도함수를 식으로 정의해 보라.
+
+$$
+\begin{aligned}
+\mathbf{y} &\sim \mathcal{N}(\mathbf{X} \boldsymbol{\beta}, \mathbf{V})\\
+\mathbf{K}^{\prime} \mathbf{y} &\sim \mathcal{N}(\mathbf{0}, \mathbf{K}^{\prime} \mathbf{V K}), \quad \because \mathbf{K}^{\prime} \mathbf{X}=\mathbf{0}\\
+\end{aligned}
+$$
+
+-   일반적인 $m$차원의 정규분포 $z\sim N(0,\Sigma)$의 로그가능도함수는 다음과 같다.
+
+$$
+l = -\frac{1}{2}\left[m \ln (2 \pi)+\ln |\Sigma|+z^{\top} \Sigma^{-1} z\right]
+$$
+
+-   이것을 그대로 $z=K^{\prime} y, \Sigma=K^{\prime} V K$에 대입한다. 참고로 $K^{\prime} y$ 의 차원은 $\left(N-r_X\right) \times 1$이다.
+
+$$
+l_1 = -\frac{1}{2}\left[(N-r_X) \log (2 \pi)+\log \left|\mathbf{K}^{\prime} \mathbf{V} \mathbf{K}\right|+\left(\mathbf{K}^{\prime} \mathbf{y}\right)^{\top}\left\{\mathbf{K}^{\prime} \mathbf{V} \mathbf{K}\right\}^{-1}\left(\mathbf{K}^{\prime} \mathbf{y}\right)\right]
+$$
+
+### (b)
+
+$l_1,l_2$식의 형태가 같은걸 보여라
+
+$$
+\begin{aligned}
+l_2 &=\text { constant }-\frac{1}{2} \log |\mathbf{V}|-\frac{1}{2} \log \left|\mathbf{X}^{\prime} \mathbf{V}^{-1} \mathbf{X}\right|-\frac{1}{2} \mathbf{y}^{\prime} \mathbf{P} \mathbf{y}\\
+& \text { for } \mathbf{P}=\mathbf{V}^{-1}-\mathbf{V}^{-1} \mathbf{X}\left(\mathbf{X}^{\prime} \mathbf{V}^{-1} \mathbf{X}\right)^{-} \mathbf{X}^{\prime} \mathbf{V}^{-1} 
+\end{aligned}
+$$
+
+정리가 안됨...
+
+## 6.9 (미완성)
+
+**(6.66)의 제시된 치환을** $Z^\prime Py$에 적용해서 어떤 형태가 되는 지 보여라
+
+For $\mathbf{y} \sim \mathcal{N}(\mathbf{X} \boldsymbol{\beta}, \mathbf{V})$ with $\mathbf{K}^{\prime} \mathbf{X}=\mathbf{0}$, we have
+
+$$
+\mathbf{K}^{\prime} \mathbf{y} \sim \mathcal{N}\left(\mathbf{0}, \mathbf{K}^{\prime} \mathbf{V K}\right)
+$$
+
+ML equations for $\mathbf{K}^{\prime} \mathbf{y}$ can therefore be derived from those for $\mathbf{y} \sim$ $\mathcal{N}(\mathbf{X} \boldsymbol{\beta}, \mathbf{V})$, namely (6.58), by replacing
+
+$$
+\begin{array}{lllllll}
+\mathbf{y} & \text { with } & \mathbf{K}^{\prime} \mathbf{y} ; & \text { and }  & \mathbf{X} & \text { with } & \mathbf{K}^{\prime} \mathbf{X}=\mathbf{0}; \\
+\mathbf{Z} & \text { with } & \mathbf{K}^{\prime} \mathbf{Z}  & \text { and } & \mathbf{V} & \text { with } & \mathbf{K}^{\prime} \mathbf{V K} .
+\end{array} 
+\quad \quad (6.66)
+$$
+
+무슨말인지 모르겠어....
+
+## 6.10 (다음에...)

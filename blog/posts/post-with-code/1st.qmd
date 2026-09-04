@@ -1,0 +1,224 @@
+---
+title: "1st LMM code"
+#format: html
+#author: "Harlow Malloc"
+date: "2025-02-22"
+categories: [LMM, code, analysis]
+#image: "image.jpg"
+---
+
+-   수정 (피드백)
+
+1.  선형혼합모형 모형식에 대해 보다 정확한 Notation 환자마다 treat가 1가지인데 그것에 대한 자세한 표현
+
+2.  랜덤효과에 대한 분산 설명을 보다 통계적으로 표현 (애매한 표현은 자제)
+
+3.  WGT를 포함한 모형이 잘못된 이유 (nonsigular)부분이 나오는 이유를 확인
+
+4.  모형과 행렬대수학 수식간에 자유로운 이동이 가능하게끔 모형을 익힌다.
+
+5.  REML부분에 마지막 설명 꼭 쓰는 게 맞는가에 대한 부분이 틀렸기에 다시 수정해본다.
+
+```{r}
+#| message: false
+library(dplyr)
+library(tidyr)
+library(lme4)
+```
+
+### 데이터 설명 및 변환
+
+해당 데이터는 `TREAT(A,B,C,PLACEBO)`치료제를 받고 혈압이 어떻게 변하는 지 7번 반복측정데이터이다.
+
+```{r}
+bp <- readxl::read_xlsx("/Users/yd/Documents/Statistic/seminar/blog/data/blood_pressure_data.xlsx")
+knitr::kable(bp %>% head())
+```
+
+반복측정자료(종단데이터)를 쓰기위해 `VSSBL,W2,W4,...`을 하나의 변수 `WEEK`로 만들어 long데이터로 변환한다.
+
+```{r}
+bp_long <- bp %>%
+  pivot_longer(
+    cols = c(VSSBL,W2,W4,W6,W8,W10,W12),
+    #cols = c(W2,W4,W6,W8,W10,W12),
+    names_to = "WEEK",
+    values_to = "BP"
+    )
+
+knitr::kable(select(bp_long, -c(ETHNIC, GENDER, HGT, WGT)) %>% head())
+```
+
+### 모형설정해보기
+
+단순한 선형혼합모형을 만들어 보기 위해 우선, 어떤 변수를 선택할지 확인해보기 위해 lm을 써서 확인해본다.
+
+```{r}
+lm1 <- lm(BP ~ .,data = bp_long)
+summary(lm1)
+```
+
+유의미한 변수로 `WEEK, WGT, TREAT`중에 `WEEK, TREAT`를 사용해서 `BP`혈압을 예측하는 모형을 만들어보자.
+
+`WEEK, TREAT`는 고정효과(범주형)로 넣고 환자`PATID`별 랜덤 절편을 구성하는 모형을 생각하고 돌려본다.
+
+$$
+\begin{aligned}
+\mathrm{Y}_{ijk} &= \mu +\alpha_i + \beta_j + b_{0k}+\varepsilon_{ijk}\\
+& i = 1,\cdots,6 \ (\text{week})\\
+& j = 1,2,3 \ (\text{treat}) \\
+& k = 1,2,\cdots,707 \ (\text{patid})\\
+\end{aligned}
+$$
+
+-   $\mu$ : 기준범주 $(\text{week}\left.=\mathrm{VSSBL}, \text{treat}=\mathrm{PLACEBO}\right)$ 일 때의 평균 혈압(고정절편)
+-   $\alpha_i$ : 각 주차( $\mathrm{W} 2, \mathrm{~W} 4, \ldots, \mathrm{~W} 12$ )가 기준 주차(VSSBL) 대비 혈압에 미치는 영향
+-   $\beta_j$ : 각 치료제(A, B, C)가 위약효과(PLACEBO) 대비 혈압에 미치는 영향
+-   $b_{0 i}$ : 환자 $i$ 에 대한 랜덤절편, $b_{0 i} \sim N\left(0, \sigma_b^2\right)$
+-   $\varepsilon_{i j}$ : 오차항, $\varepsilon_{i j} \sim N\left(0, \sigma^2\right)$
+
+```{r}
+bp_long$TREAT <- factor(bp_long$TREAT,
+                        levels = c("PLACEBO","A","B","C"))
+
+#bp_long$WEEK <- factor(bp_long$WEEK,
+                       #levels = c("VSSBL","W2","W4","W6","W8","W10","W12"))
+
+lmm_model <- lmer(
+  BP ~ WEEK * TREAT + (1 |PATID), 
+  data = bp_long,
+  REML=T
+)
+# 모델 요약 출력
+summary(lmm_model)
+# 분산구성 확인 (랜덤효과 분산, 상관구조)
+VarCorr(lmm_model)
+# 모형 적합도 평가
+anova(lmm_model)
+```
+
+표에서 각 고정효과 계수(Estimate)는 ‘기준범주(Week = W0, Treat = A)’ 대비 혈압(BP)이 얼마나 변하는지를 나타낸다.
+
+1.  고정효과
+
+-   Intercept = 106.3671
+-   WEEK=VSSBL (기준)이고, TREAT =PLACEBO (기준)인 환자의 추정 평균 혈압.
+-   WEEK: W2 = - 8.2364
+-   주차(week) 2 일 때, 주차 0 대비 평균 혈압이 약 8.24 낮아진다는 추정치.
+
+$\vdots$
+
+-   TREAT: A = -4.2192 치료군(Treat)이 A 일 때, PLACEBO 군 대비 평균 혈압이 약 4.2만큼 낮아진다는 추정치.
+
+-   TREAT: B = -2.4177 치료군이 B 일 때, PLACEBO 군 대비 평균 혈압이 약 2.4 낮아진다는 추정치.
+
+-   TREAT: C = -3.6554 치료군이 C 일 때, PLACEBO군 대비 평균 혈압이 약 3.7 낮아진다는 추정치.
+
+2.  랜덤효과
+
+-   PATID (Intercept) Variance =32.46 환자별 랜덤절편 $\left(b_{0 i}\right)$ 의 분산이 32.46.
+
+이는 "개별 환자마다 (고정효과로 추정한 전체 평균 절편과 달리) 시작 혈압 수준이 $\pm$ 5.697 정도의 표준편차 범위로 달라질 수 있다".
+
+-   Residual Variance =27.49 모델의 잔차 $\left(\varepsilon_{i j}\right)$ 분산은 27.49 ,표준편차는 약 5.243 으로 추정된다.
+
+이는 "환자 수준 외에, 개별 관측에서 발생하는 오차가 $\pm$ 5.243 정도의 표준편차를 갖는다"는 것을 의미.
+
+### 다시 모형 설정해보기
+
+이번에는 기존 모형에서 `WGT`를 랜덤기울기로 포함시켜서 모형을 돌려보자.
+
+즉, 모형을 좀더 복잡하게 만들어보자
+
+$$
+\begin{aligned}
+\mathrm{Y}_{ijk} &= \mu +\alpha_i + \beta_j + \gamma\ x_k + b_{0k} + b_{1k}\ x_k +\varepsilon_{ijk}\\
+& = \alpha_i + \beta_j + (\mu + b_{0k}) + (\gamma + b_{1k})x_k +\varepsilon_{ijk}\\
+& i = 1,\cdots,6\ (\text{week})\\
+& j = 1,2,3\ (\text{treat})\\
+& k = 1,2,\cdots,707\ (\text{patid})\\
+\end{aligned}
+$$
+
+모형의 결과는 다음과 같다.
+
+우선 `WGT`의 랜덤효과를 넣어보니 분산이`1.024e-04` 매우 작게 나온것을 알수 있다. 이런 경우 몸무게를 랜덤효과로 넣기엔 모형이 적절치 않다는 것을 판단 할수 있다.
+
+```{r}
+lmm_model1 <- lmer(
+  BP ~ WEEK + TREAT + WGT + (1 + WGT|PATID), 
+  data = bp_long
+  
+)
+# 모델 요약 출력
+summary(lmm_model1)
+# 분산구성 확인 (랜덤효과 분산, 상관구조)
+VarCorr(lmm_model1)
+# 모형 적합도 평가
+anova(lmm_model1)
+```
+
+### 다른 데이터로 랜덤효과의 기울기 살펴보기
+
+랜덤효과중에 기울기로 쓰기 적절한 데이터는 `sleepstudy`가 있다.
+
+```{r}
+data("sleepstudy")
+knitr::kable(sleepstudy%>%head(15))
+```
+
+$y$를 reaction으로 두고 모형을 구성하면 다음과 같다.
+
+$$
+\begin{aligned}
+y_{ij}&=\mu + \alpha\ x_i + b_{0j} + b_{1j}\ x_i + \varepsilon_{ij}\\
+&=(\mu+b_{0j}) + (\alpha + b_{1j})x_i + \varepsilon_{ij}\\
+& i=1,2,\ldots,10 \ (Day)\\
+& j=1,2,\ldots,18 \ (Subject)\\
+\end{aligned}
+$$
+
+```{r}
+lmm_sleep <- lmer(Reaction ~ 1 + Days + (1 + Days|Subject), sleepstudy, REML=T)
+summary(lmm_sleep)
+```
+
+### REML
+
+**REML(Restricted Maximum Likelihood)**은 혼합효과모형(또는 분산성분모형)에서 분산성분(랜덤효과의 분산, 오차분산 등)을 추정하는 방법 중 하나로, **최대우도추정(MLE)**의 한계를 보완하기 위해 제안된 방식이다. 주로 **혼합모형(Linear Mixed Models)**에서 사용한다.
+
+1.  왜 쓸까?
+
+-   전통적인 최대우도추정(MLE)에서는 고정효과 파라미터와 분산성분(랜덤효과 분산, 오차 분산)을 동시에 추정한다.
+
+-   이때, 고정효과가 포함되면서 발생하는 자유도 문제 때문에, 분산성분 추정량이 bias를 가질 수 있다는 단점이 언급되었다.
+
+-   즉, MLE로 추정한 분산성분은 실제보다 작게 추정되는 경향(편향)이 있을 수 있다.
+
+-   REML은 고정효과로부터 오는 파라미터 추정의 자유도 부분을 제거(또는 제한)해서 분산성분만 좀 더 정확하게 추정하려는 방법이다.
+
+2.  작동 원리
+
+-   고정효과로 설명되는 부분($X\beta$)와 **잔차(랜덤효과 + 오차)**를 분리
+
+-   고정효과에 대한 추정치로 인해 소모되는 자유도를 고려하여, 분산성분에 대한 편향(bias)을 보정
+
+-   보정된(“restricted”) 우도함수를 최대화하는 방식으로 분산성분을 추정
+
+즉, REML은 (고정효과를 모르는 상태에서) 분산만 놓고 본다면 어떤 likelihood가 가장 그럴듯한지 추정한다고 볼 수 있다.
+
+3.  그럼 REML을 무조건 쓰는 것이 좋은 걸까?
+
+그건 아닌게 단순한 예시로 모형선택을 할 때 일반적인 **AIC,BIC,LR**를 구할 때는 REML을 사용할 수 없다.
+
+당연하게도 완전한 가능도함수를 갖고 비교해야하기 때문에 모형선택을 할 때는 사용할 수 없다.
+
+Unbalanced data를 다루게 되면 구체적인 REML을 소개하겠습니다.
+
+```{r}
+lmm_model1 <- lmer(
+  BP ~ (1|WEEK) + TREAT + (1 |PATID), 
+  data = bp_long
+)
+summary(lmm_model1)
+```

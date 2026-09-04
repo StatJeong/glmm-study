@@ -1,0 +1,35 @@
+---
+title: "Jiming's GLMM Chapter 3 Exercise Review"
+date: "2025-05-28"
+categories: [study]
+---
+
+이 포스트는 `Jiming Jiang, Thuan Nguyen - Linear and Generalized Linear Mixed Models and Their Applications`의 연습 문제를 리뷰한다.
+
+## 3.1
+
+**Show that, under the assumption made in the first paragraph of Sect. 3.2, the vector of observations,** $y=\left(y_1, \ldots, y_n\right)^{\prime}$, has the same distribution as the Gaussian linear mixed model (1.1), where $\alpha \sim N(0, G), \epsilon \sim N\left(0, \tau^2 I\right)$, and $\alpha$ and $\epsilon$ are independent.
+
+$$
+\begin{aligned}
+y& =X \beta+Z \alpha+\epsilon \\
+f_i\left(y_i \mid \alpha\right) &=\exp \left\{\frac{y_i \xi_i-b\left(\xi_i\right)}{a_i(\phi)}+c_i\left(y_i, \phi\right)\right\}
+\end{aligned}
+$$
+
+문제에 있는 정보를 정리하면,
+
+$$
+y \mid \alpha \sim N\left(X \beta+Z \alpha, \tau^2 I\right)
+$$
+
+Conditional Distribution이 Normal을 따르므로 평균과 분산은 다음과 같다.
+
+$$
+\begin{aligned}
+E[\mathbf{y}] & =X \beta+Z E[\boldsymbol{\alpha}]+E[\boldsymbol{\varepsilon}]=X \beta, \\
+\operatorname{Var}(\mathbf{y}) & =Z \operatorname{Var}(\boldsymbol{\alpha}) Z^{\prime}+\operatorname{Var}(\boldsymbol{\varepsilon})=Z G Z^{\prime}+\tau^2 I .
+\end{aligned}
+$$
+
+그럼, y의

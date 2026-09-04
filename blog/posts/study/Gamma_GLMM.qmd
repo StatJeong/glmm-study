@@ -1,0 +1,493 @@
+---
+title: "Gamma GLMM 시뮬레이션: 데이터 생성과 링크함수 선택"
+author: ""
+format:
+  html:
+    embed-resources: true
+    html-math-method: katex
+date: "2026-08-20"
+categories: [GLMM, study, Gamma, simulation, link-function]
+number-sections: true
+---
+
+## 시뮬레이션 데이터 생성
+
+본 시뮬레이션은 다음과 같은 Gamma GLMM으로부터 데이터를 생성한다:
+
+$$
+Y_{ij} \mid X_{ij}, U_i \sim \text{Gamma}\left(\text{shape}=\nu,\ \text{scale}=\frac{\mu_{ij}}{\nu}\right)
+$$
+
+$$
+\mu_{ij} = \exp(\beta_0+\beta_1X_{ij}+U_i), \qquad U_i \sim N(0,\sigma^2)
+$$
+
+여기서 $i=1,\dots,m$은 그룹, $j=1,\dots,n$은 그룹 내 관측치 인덱스다.
+
+### Mean-parameterized Gamma
+
+Gamma 분포는 흔히 (shape, scale) $=(\alpha,\beta)$ 조합의 밀도함수로 배운다:
+
+$$
+f(y;\alpha,\beta) = \frac{1}{\Gamma(\alpha)\beta^\alpha}\,y^{\alpha-1}e^{-y/\beta}, \qquad y>0, \qquad E(Y)=\alpha\beta
+$$
+
+그 자체로는 평균이 $\alpha\beta$로 정해질 뿐, 원하는 값으로 고정되지 않는다. 이 시뮬레이션에서는 shape에 $\nu$를, scale에 $\mu/\nu$를 대입해서
+
+$$
+E(Y_{ij}) = \nu\times\frac{\mu_{ij}}{\nu} = \mu_{ij}
+$$
+
+가 정확히 성립하도록 모수화했다. R의 `rgamma()`는 scale 대신 그 역수인 rate(=$1/\text{scale}$) 인자를 받으므로, 실제 코드에서는
+
+```r
+rgamma(n, shape = nu, rate = nu / mu)
+```
+
+로 호출한다. `rate = nu/mu`는 위에서 정한 `scale = mu/nu`의 역수와 정확히 같은 값이며, 어느 쪽으로 계산해도 평균은 $\mu$가 된다:
+
+$$
+E(Y) = \nu\times\frac\mu\nu = \mu \qquad\Longleftrightarrow\qquad E(Y)=\frac{\nu}{\nu/\mu}=\mu
+$$
+
+이렇게 지정한 $\mu_{ij}$가 그대로 조건부 평균이 되므로, 이를 mean-parameterized Gamma라 부른다.
+
+## 링크함수 선택: Canonical Link 대신 Log Link
+
+### 지수족(exponential dispersion family) 표준형
+
+일반화선형모형에서 반응변수의 분포는 지수족 표준형으로 쓸 수 있다:
+
+$$f(y;\theta,\phi) = \exp\left\{ \frac{y\theta - b(\theta)}{a(\phi)} + c(y,\phi) \right\}$$
+
+$\theta$는 natural parameter, $\phi$는 dispersion parameter, $b(\cdot)$는 log-partition function이다. 이 표준형에서 평균은 다음 항등식으로 얻어진다:
+
+$$\mu := E(Y) = b'(\theta)$$
+
+### Gamma를 $(\mu,\nu)$ 로 재표현
+
+Gamma 분포는 원래 $(\alpha,\beta)$(shape, rate) 두 모수로 표현되지만, $\alpha=\nu$, rate$=\nu/\mu$가 되도록 좌표를 바꾸면(그러면 $\mu=\alpha/\text{rate}$가 평균이 된다) 밀도함수는
+
+$$f(y;\mu,\nu) = \frac{\nu^\nu}{\Gamma(\nu)\,\mu^\nu}\, y^{\nu-1} \exp\!\left(-\frac{\nu y}{\mu}\right)$$
+
+로 쓸 수 있다. 로그를 취하면
+
+$$\log f(y;\mu,\nu) = \nu\left(-\frac{y}{\mu} - \log\mu\right) + \Big[\nu\log\nu - \log\Gamma(\nu) + (\nu-1)\log y\Big]$$
+
+이고, 대괄호 앞의 $\nu$를 지수족 표준형의 $1/a(\phi)$ 자리에, 대괄호 안의 나머지를 $c(y,\phi)$ 자리에 대응시키면 다음과 같이 항이 맞아떨어진다:
+
+$$\phi := \frac{1}{\nu}, \qquad a(\phi) := \phi, \qquad \theta = -\frac{1}{\mu}, \qquad b(\theta) = -\log(-\theta)$$
+
+**검산.** 이 대응이 맞다면 $b'(\theta)=\mu$, $b''(\theta)=\mu^2$이어야 한다.
+
+$$b'(\theta) = \frac{d}{d\theta}\{-\log(-\theta)\} = -\frac{1}{\theta} = \mu$$
+
+$$b''(\theta) = \frac{1}{\theta^2} = \mu^2, \qquad \mathrm{Var}(Y) = a(\phi)\,b''(\theta) = \frac{\mu^2}{\nu}$$
+
+마지막 식은 Gamma(shape$=\nu$, rate$=\nu/\mu$)의 실제 분산 $\nu \cdot (\mu/\nu)^2 = \mu^2/\nu$와 정확히 일치한다. 따라서 위 대응은 단순한 표기 맞추기가 아니라 실제로 성립하는 재모수화다.
+
+### Canonical link 유도
+
+canonical link는 정의상 선형예측변수를 $\eta := \theta$로 두는 특정한 선택이다. 위에서 $\theta=-1/\mu$임을 보였으므로, Gamma의 canonical link는
+
+$$g_{\text{canonical}}(\mu) = -\frac{1}{\mu}$$
+
+즉 negative inverse link다.
+
+### 실제 사용: log link, $\eta=\log\mu$
+
+이 시뮬레이션과 이후 추정에서는 $\eta = \log\mu$, 즉 $\mu = \exp(\eta)$인 log link를 사용했다. canonical link 대신 log link를 택한 이유는 두 가지다.
+
+**(a) 정의역 문제.** canonical link에서는 $\mu = -1/\eta$이므로 $\mu>0$이 되려면 $\eta<0$이 강제된다. 즉 선형예측변수 $\eta=\beta_0+\beta_1 X+U_i$가 항상 음수여야 하므로 회귀계수 $\beta$에 부호 제약이 걸린다. 반면 log link는 $\eta$가 실수 전체를 움직여도 $\mu=\exp(\eta)>0$이 자동으로 보장되므로 $\beta$에 아무 제약이 없다.
+
+**(b) GVA를 닫힌 형태로 풀기 위한 구조적 이유.** log link를 쓰면 로그가능도가 $\eta$에 대해 $-\nu\eta-\nu y e^{-\eta}$ 형태로 떨어지는데, 이 순수 지수함수 형태($e^{-\eta}$) 덕분에 랜덤효과에 대한 기댓값이 정규분포의 적률생성함수(MGF) 공식으로 닫힌다. canonical link였다면 이 자리에 $\log(-\eta)$라는, MGF 트릭이 통하지 않는 항이 남아 GVA 자체가 성립하지 않았을 것이다. 이 구조가 실제로 어떻게 GVA를 닫힌 형태로 만들어주는지는 다음 절에서 ELBO를 직접 유도하며 상세히 보인다.
+
+### Link Function과 두 번째 모수 $\nu$의 독립성
+
+- link function은 정의상 평균 $\mu$ 하나만 입력으로 받는 함수, 즉 $g(\mu)=\eta$다.
+- $\beta \to \eta \to \mu=g^{-1}(\eta) \to \theta=-1/\mu$로 이어지는 사상 사슬의 어디에도 $\phi(=1/\nu)$가 등장할 자리가 없다. 지수족의 정의 자체가 $b(\theta)$를 $\phi$ 없이 $\theta$만의 함수로 요구하기 때문이다.
+- $\phi(=1/\nu)$는 분산식 $\mathrm{Var}(Y)=a(\phi)\,b''(\theta)$에서 처음 등장하며, 이미 정해진 $\mu$에 곱해지는 스칼라로만 작용한다. 평균의 "위치"는 link가 담당하고, 그 주위 "퍼짐의 크기"는 $\nu$가 별도로 담당하는 구조다.
+- Poisson이나 Binomial은 $\phi$가 자유모수가 아니라 1로 고정돼 있어서 이 구분이 겉으로 드러나지 않는다(사실상 $\mu$가 분포를 전부 결정한다). 반면 Gamma나 Normal처럼 $\phi$가 진짜 자유모수인 분포에서는 "link가 건드리지 못하는 남은 자유도"가 실제로 존재한다 — 이것이 Gamma가 Poisson보다 이론적으로 한 단계 더 다뤄야 할 구조다.
+- 결론적으로, link function 자체의 정의(평균만의 함수)로부터 두 모수 중 하나($\nu$)와는 구조적으로 완전히 독립임이 따라 나온다. 이는 임의로 가정한 것이 아니라 지수족 표준형에서 엄밀하게 유도되는 사실이다.
+
+## GVA가 닫힌 형태로 풀리는 이유
+
+### 문제 설정
+
+랜덤효과 $U_i$가 있는 그룹 $i$에 대해, 우리가 알고 싶은 건 사후분포 $p(U_i\mid Y_i)$인데 이건 닫힌 형태가 없다. 대신 $q(U_i) = N(\mu_i,\lambda_i)$로 근사하고, 이 근사가 얼마나 좋은지를 재는 지표로 ELBO(evidence lower bound)를 쓴다:
+
+$$\text{ELBO}_i(\mu_i,\lambda_i) = E_q[\log p(Y_i\mid U_i)] + E_q[\log p(U_i)] - E_q[\log q(U_i)]$$
+
+(이 식은 KL divergence를 최소화하는 것과 동치이며, $\log p(Y_i)$가 상수라는 사실에서 유도된다: $\log p(Y_i) = \mathrm{KL}(q\,\|\,p(\cdot|Y_i)) + \text{ELBO}_i$.)
+
+뒤의 두 항(사전분포 항 + 엔트로피 항)은 $q,p(U_i)$가 둘 다 정규분포라 표준 계산으로 닫힌 형태가 나온다:
+
+$$E_q[\log p(U_i)] - E_q[\log q(U_i)] = -\frac{\mu_i^2+\lambda_i}{2\sigma^2} - \frac12\log\sigma^2 + \frac12\log\lambda_i$$
+
+문제는 첫 번째 항, 즉 데이터 항이다.
+
+### log link를 쓸 때의 데이터 항
+
+log link($\eta=\log\mu$, 즉 $\mu=e^\eta$)에서, $(\mu,\nu)$로 재모수화한 Gamma 로그밀도는:
+
+$$\log p(y\mid\eta) = -\nu\eta - \nu y e^{-\eta} + \big[\nu\log\nu+(\nu-1)\log y-\log\Gamma(\nu)\big]$$
+
+$\eta_{ij}=\eta_{ij}^{fix}+U_i$를 대입하고 $U_i\sim q=N(\mu_i,\lambda_i)$에 대해 기댓값을 취하면, 대부분의 항은 $U_i$에 선형이라 쉽지만 $e^{-U_i}$ 항 하나만 문제가 된다:
+
+$$E_q[e^{-U_i}] = ?$$
+
+### 트릭: 정규분포 MGF
+
+$Z\sim N(m,s^2)$이면 $E[e^{tZ}]=\exp(tm+t^2s^2/2)$. 완전제곱식으로 직접 증명:
+
+$$tz - \frac{(z-m)^2}{2s^2} = -\frac{1}{2s^2}\big[z-(m+ts^2)\big]^2 + \Big(tm+\frac{t^2s^2}{2}\Big)$$
+
+우변 첫 항은 (정규화하면) 그대로 정규분포 밀도라 적분하면 1이 되므로:
+
+$$E[e^{tZ}] = \exp\Big(tm+\frac{t^2s^2}{2}\Big)$$
+
+$t=-1$을 대입하면:
+
+$$\boxed{E_q[e^{-U_i}] = \exp\Big(-\mu_i+\frac{\lambda_i}{2}\Big)}$$
+
+**이게 log link가 GVA를 닫힌 형태로 만들어주는 유일하고 결정적인 이유다.** log link가 $\eta$에 대해 순수 지수함수 형태($e^{-\eta}$)를 만들어주고, 그 지수함수가 정규분포 랜덤효과와 결합하면서 MGF 공식이 그대로 적용된다.
+
+### 완전한 ELBO
+
+이제 $D_i := \sum_j Y_{ij}e^{-\eta_{ij}^{fix}}$로 두면, 그룹 $i$의 데이터 항은:
+
+$$E_q[\log p(Y_i\mid U_i)] = -\nu\sum_j\eta_{ij}^{fix} - \nu n\mu_i - \nu D_i\exp\Big(-\mu_i+\frac{\lambda_i}{2}\Big) + (\text{상수})$$
+
+모두 합친 완전한 ELBO:
+
+$$\text{ELBO}_i = -\nu\sum_j\eta_{ij}^{fix} -\nu n\mu_i - \nu D_ie^{-\mu_i+\lambda_i/2} - \frac{\mu_i^2+\lambda_i}{2\sigma^2}-\frac12\log\sigma^2+\frac12\log\lambda_i$$
+
+### 1차조건 -- 이게 정확히 코드가 푸는 방정식
+
+$\mu_i$로 미분해서 0으로 놓으면(chain rule로 $\frac{d}{d\mu_i}e^{-\mu_i+\lambda_i/2}=-e^{-\mu_i+\lambda_i/2}$):
+
+$$\nu D_i\exp\{-\mu_i+\lambda_i/2\} = \nu n + \frac{\mu_i}{\sigma^2} \qquad \text{(I)}$$
+
+$\lambda_i$로 미분해서 0으로 놓으면:
+
+$$\frac1{\lambda_i} = \nu D_ie^{-\mu_i+\lambda_i/2}+\frac1{\sigma^2} \qquad \text{(II)}$$
+
+(I)를 (II)에 대입해서 $\lambda_i$를 소거하면:
+
+$$\lambda_i = \Big[\nu n + \frac{1+\mu_i}{\sigma^2}\Big]^{-1}$$
+
+이걸 다시 (I)에 넣으면 $\mu_i$ 하나짜리 방정식이 완성된다:
+
+$$\nu D_i\exp\left\{-\mu_i + \frac12\Big[\nu n+\frac{1+\mu_i}{\sigma^2}\Big]^{-1}\right\} = \nu n+\frac{\mu_i}{\sigma^2}$$
+
+**이 방정식이 `core_methods.R`의 `.obj_grad_hess`(gmu, glam, H11, H12, H22 계산)와 `.newton_backtrack`(이 방정식을 Newton-Raphson으로 반복해서 푸는 부분)이 실제로 수치적으로 풀고 있는 대상이다.** 코드의 `E <- nu * Bi_or_Di * exp(-mu + lam/2)` 한 줄이, 위에서 유도한 $\nu D_i e^{-\mu_i+\lambda_i/2}$ 항 그 자체다.
+
+### 만약 canonical link($\eta=-1/\mu$)를 썼다면
+
+로그가능도의 $\eta$-의존 부분이 $\nu y\eta+\nu\log(-\eta)$ 형태가 되는데, 여기에 $\eta=\eta^{fix}+U_i$를 넣고 $E_q[\log(-\eta^{fix}-U_i)]$를 계산해야 한다. 이건 로그 안에 정규확률변수가 더해진 형태의 기댓값이라 일반적으로 닫힌 형태가 없다 -- 정규분포 MGF 공식을 쓸 수 있는 $e^{-\eta}$ 형태가 애초에 안 나오기 때문이다. 이게 2절에서 "canonical 대신 log link를 썼다"고 한 세 번째 이유(GVA 닫힌 형태)의 실제 증명이다.
+
+## 시뮬레이션 결과: GVA와 MLE 비교
+
+Hall, Ormerod & Wand (2011, *Statistica Sinica*)는 Poisson random-intercept GLMM에서 그룹당 관측치 수 $n$을 고정하고 그룹 수 $m\to\infty$로 보내면 GVA 추정량이 비일관적(inconsistent)임을 증명했다. 이 현상이 Poisson에 국한된 것인지, log-link Gamma에서도 나타나는지 확인하기 위해 아래 시뮬레이션을 진행했다.
+
+### Poisson 대조군 ($n=5$)
+
+Poisson은 기존 이론과 비교할 수 있는 대조군이다: $m$이 커지면 편향이 소멸해야 한다.
+
+| $m$ | GVA $\hat{\beta}_0$ 편향 | GVA $\hat{\beta}_1$ 편향 | GVA $\hat{\sigma}^2$ 편향 |
+|-----------------:|-----------------:|-----------------:|-----------------:|
+| 3000 | +0.0003 | +0.0006 | -0.008 |
+| 10000 | +0.0024 | +0.0008 | -0.006 |
+
+두 $m$ 값 모두 편향이 노이즈 수준으로 작아 기존 이론과 일치한다. 이는 시뮬레이션 코드 자체가 올바르게 작동함을 검증하는 역할도 겸한다.
+
+### Gamma, $\sigma^2$(참값)$=1$, $n=5$
+
+| $m$ | GVA $\hat{\beta}_0$ (참값 1) | GVA $\hat{\beta}_1$ (참값 0.5) | GVA $\hat{\sigma}^2$ (참값 1) | MLE $\hat{\beta}_0$ |
+|--------------:|--------------:|--------------:|--------------:|--------------:|
+| 1000 | 2.000 | 0.508 | 2.016 | 0.999 |
+| 10000 | 2.014 | 0.507 | 2.039 | 0.997 |
+
+$m$을 10배 늘려도 GVA 편향이 전혀 줄지 않고 참값의 약 2배 수준에서 유지된다(plateau). MLE는 두 경우 모두 0.003 이내로 정확하다.
+
+### Gamma, $\sigma^2$(참값)$=2$, $n=5$
+
+| $m$ | GVA $\hat{\beta}_0$ (참값 1) | GVA $\hat{\beta}_1$ (참값 0.5) | GVA $\hat{\sigma}^2$ (참값 2) | MLE $\hat{\beta}_0$ |
+|--------------:|--------------:|--------------:|--------------:|--------------:|
+| 500 | 2.743 | – | 5.456 | 0.999 |
+| 1000 | 2.808 | 0.518 | 5.921 | 0.998 |
+| 10000 | 2.851 | 0.519 | 6.187 | 0.996 |
+| 30000 | 2.875 | – | 6.489 | 1.000 |
+| 100000 | 2.867 | 0.497 | 6.271 | 1.000 |
+
+$m$을 200배($500\to100000$) 늘려도 편향이 사라지지 않고 plateau를 유지한다. $\sigma^2=1$일 때보다 편향의 크기 자체가 커진다($\hat{\beta}_0$는 약 2.85배, $\hat{\sigma}^2$는 약 3.15배 수준) — 편향의 크기가 $\sigma^2$에 의존한다는 것을 시사한다.
+
+### Multi-Start를 통한 국소최적점 여부 확인
+
+GVA는 변분 EM(반복 최적화)으로 풀리므로, 관찰된 편향이 진짜 전역해가 아니라 초기값에 따른 국소최적점 문제일 가능성을 배제해야 한다. 서로 다른 7개 시작점(참값 자체를 시작점으로 준 경우 포함)에서 각각 최적화를 돌려 ELBO(변분 하한)가 가장 높은 지점을 비교한 결과, 모든 시작점이 거의 동일한 지점($\hat{\beta}_0 \approx 2.0$)으로 수렴함을 확인했다. 즉 참값에서 정확히 출발시켜도 알고리즘이 스스로 더 높은 ELBO를 찾아 그 지점으로 이동하며, 이는 이 편향이 최적화 알고리즘의 결함이 아니라 GVA 목적함수 자체의 성질임을 강하게 시사한다.
+
+### $\beta_1$(기울기)은 왜 편향이 없는가 (잠정적 관찰)
+
+위 표에서 $\beta_0$와 $\sigma^2$는 뚜렷한 편향을 보이지만 $\beta_1$은 모든 설정에서 참값(0.5)에 가깝게 유지된다는 점이 관찰된다. 이는 반복적으로 재현되는 패턴이다.
+
+이 현상에 대해 다음과 같은 설명을 시도해볼 수 있으나, 아래는 검증된 결론이 아니라 저자의 잠정적 추측임을 명확히 밝힌다:
+
+$$\eta_{ij} = \beta_0 + \beta_1 X_{ij} + U_i$$
+
+$\beta_0$와 $U_i$는 둘 다 그룹 $i$의 모든 관측치에 $X_{ij}$와 무관하게 동일하게 더해지는 상수항이다. 반면 $\beta_1$은 같은 그룹 내에서 $X_{ij}$가 $j$에 따라 변하는 정도(그룹 내 대비)로부터 식별된다. 이 구조적 차이가 $\beta_0$/$\sigma^2$와 $\beta_1$의 편향 여부 차이와 관련이 있을 가능성을 생각해 볼 수 있다.
+
+다만 이 설명은 다음과 같은 한계를 가진다:
+
+- 본 저자가 그 자리에서 구성한 가설로, Hall-Ormerod-Wand(2011)를 비롯한 기존 문헌에 명시적으로 제시된 논증이 아니다.
+- 본 연구에서 population-level 스코어 계산을 시도했을 때($\beta_0$에 대해) 시뮬레이션 결과와 상충하는 결과가 나와 아직 해소하지 못한 상태이며, 그 계산 틀 자체가 완전히 검증되지 않았다.
+- 따라서 이 절의 설명은 향후 이론적으로 확인이 필요한 가설로 남겨두며, 확정된 주장으로 간주해서는 안 된다.
+
+### 정리해보면
+
+- Gamma에서도 $n$을 고정하면 GVA가 비일관적임을 확인했다(Poisson과 정성적으로 동일한 현상).
+- $m$을 최대 200배까지 늘려도 편향이 전혀 줄지 않는다.
+- 편향의 크기가 $\sigma^2$에 의존한다 — $\sigma^2$가 클수록 편향도 커진다(Poisson 이론에는 없던 패턴).
+- MLE는 모든 경우에서 일관적이며 대조군 역할을 한다.
+- Multi-start로 국소최적점 문제가 아님을 확인했다.
+
+## 구현 코드
+
+### 데이터 생성 코드
+
+$Y_{ij} \mid X_{ij}, U_i \sim \mathrm{Gamma}(\text{shape}=\nu,\ \text{rate}=\nu/\mu_{ij})$ 형태로 mean-parameterized Gamma 표본을 생성한다. $\nu$(shape)는 고정 상수로 취급했다.
+
+```{r}
+#| eval: false
+simulate_data <- function(m, n, beta0, beta1, sigma2, family = c("poisson","gamma"), nu = 2) {
+  family <- match.arg(family)
+  X <- matrix(rnorm(m * n), nrow = m, ncol = n)
+  U <- rnorm(m, 0, sqrt(sigma2))
+  eta <- beta0 + beta1 * X + U
+  mu  <- exp(eta)
+  if (family == "poisson") {
+    Y <- matrix(rpois(m * n, lambda = mu), nrow = m, ncol = n)
+  } else {
+    Y <- matrix(rgamma(m * n, shape = nu, rate = nu / mu), nrow = m, ncol = n)
+  }
+  list(X = X, Y = Y)
+}
+```
+
+### GVA(Gaussian Variational Approximation) 추정 코드
+
+각 그룹의 랜덤효과 $U_i$에 대한 근사 사후분포 $N(\mu_i,\lambda_i)$의 최적 모수를 Newton-Raphson(backtracking line search 포함)으로 구하고, 고정효과는 offset-GLM 형태의 2차원 Newton으로, $\sigma^2$는 닫힌 형태 M-step으로 번갈아 최적화하는 variational EM이다.
+
+```{r}
+#| eval: false
+.obj_grad_hess <- function(mu, lam, family, Bi_or_Di, c1, sigma2, nu = NULL) {
+  if (family == "poisson") {
+    E    <- Bi_or_Di * exp(mu + lam/2)
+    gmu  <- c1 - E - mu/sigma2
+    glam <- -0.5*E - 1/(2*sigma2) + 1/(2*lam)
+    H11  <- -E - 1/sigma2
+    H12  <- -0.5*E
+    H22  <- -0.25*E - 1/(2*lam^2)
+  } else {
+    E    <- nu * Bi_or_Di * exp(-mu + lam/2)
+    gmu  <- c1 + E - mu/sigma2
+    glam <- -0.5*E - 1/(2*sigma2) + 1/(2*lam)
+    H11  <- -E - 1/sigma2
+    H12  <- 0.5*E
+    H22  <- -0.25*E - 1/(2*lam^2)
+  }
+  list(gmu=gmu, glam=glam, H11=H11, H12=H12, H22=H22, E=E)
+}
+
+.newton_backtrack <- function(mu, lam, family, stat_i, c1, sigma2, nu=NULL, n_iter = 50) {
+  obj_fun <- function(mu, lam) {
+    if (family == "poisson") {
+      E <- stat_i * exp(mu + lam/2)
+      c1*mu - E - (mu^2+lam)/(2*sigma2) + 0.5*log(lam)
+    } else {
+      E <- nu * stat_i * exp(-mu + lam/2)
+      c1*mu - E - (mu^2+lam)/(2*sigma2) + 0.5*log(lam)
+    }
+  }
+  cur_obj <- obj_fun(mu, lam)
+  for (it in 1:n_iter) {
+    gh <- .obj_grad_hess(mu, lam, family, stat_i, c1, sigma2, nu)
+    gmu <- gh$gmu
+    glam <- gh$glam
+    H11<-gh$H11; H12<-gh$H12; H22<-gh$H22
+    det <- H11*H22 - H12^2
+    use_newton <- is.finite(det) & (det > 1e-12) & (H11 < 0)
+    dmu  <- numeric(length(mu)); dlam <- numeric(length(mu))
+    dmu[use_newton]  <- -( H22[use_newton]*gmu[use_newton] - H12[use_newton]*glam[use_newton]) / det[use_newton]
+    dlam[use_newton] <- -(-H12[use_newton]*gmu[use_newton] + H11[use_newton]*glam[use_newton]) / det[use_newton]
+    step0 <- 0.05
+    dmu[!use_newton]  <- step0*gmu[!use_newton]
+    dlam[!use_newton] <- step0*glam[!use_newton]
+
+    step <- rep(1, length(mu))
+    for (bt in 1:30) {
+      mu_try  <- mu  + step*dmu
+      lam_try <- lam + step*dlam
+      lam_try[lam_try <= 1e-8] <- NA
+      new_obj <- obj_fun(mu_try, lam_try)
+      improved <- is.finite(new_obj) & (new_obj >= cur_obj - 1e-10)
+      if (all(improved)) break
+      step[!improved] <- step[!improved] / 2
+      if (max(step) < 1e-10) break
+    }
+    mu_try[is.na(mu_try)] <- mu[is.na(mu_try)]
+    lam_try[is.na(lam_try) | lam_try<=1e-8] <- lam[is.na(lam_try) | lam_try<=1e-8]
+    new_obj <- obj_fun(mu_try, lam_try)
+    keep <- is.finite(new_obj) & (new_obj >= cur_obj - 1e-10)
+    mu[keep]  <- mu_try[keep]
+    lam[keep] <- lam_try[keep]
+    cur_obj[keep] <- new_obj[keep]
+    if (max(abs(step*dmu)) < 1e-9 && max(abs(step*dlam)) < 1e-9) break
+  }
+  list(mu = mu, lam = lam)
+}
+
+e_step_poisson <- function(mu, lam, Bi, Ybar, sigma2, n_iter = 50) {
+  .newton_backtrack(mu, lam, "poisson", stat_i = Bi, c1 = Ybar, sigma2 = sigma2, n_iter = n_iter)
+}
+
+e_step_gamma <- function(mu, lam, Di, sigma2, nu, n, n_iter = 50) {
+  .newton_backtrack(mu, lam, "gamma", stat_i = Di, c1 = -nu*n, sigma2 = sigma2, nu = nu, n_iter = n_iter)
+}
+
+robust_beta_update <- function(Xvec, Yvec, offset_full, family, nu, beta0, beta1, n_iter=50) {
+  beta0 <- unname(beta0); beta1 <- unname(beta1)
+  obj_and_gh <- function(b0, b1) {
+    eta <- b0 + b1*Xvec + offset_full
+    if (family == "poisson") {
+      mu <- exp(eta)
+      obj <- sum(Yvec*eta - mu)
+      g0 <- sum(Yvec - mu);           g1 <- sum((Yvec - mu)*Xvec)
+      h00<- -sum(mu);                 h01<- -sum(mu*Xvec);  h11<- -sum(mu*Xvec^2)
+    } else {
+      ev <- exp(-eta)
+      obj <- sum(-eta - Yvec*ev)
+      g0 <- sum(-1 + Yvec*ev);        g1 <- sum((-1 + Yvec*ev)*Xvec)
+      h00<- -sum(Yvec*ev);            h01<- -sum(Yvec*ev*Xvec); h11<- -sum(Yvec*ev*Xvec^2)
+    }
+    list(obj=obj, g0=g0, g1=g1, h00=h00, h01=h01, h11=h11)
+  }
+  cur <- obj_and_gh(beta0, beta1); cur_obj <- cur$obj
+  for (it in 1:n_iter) {
+    det <- cur$h00*cur$h11 - cur$h01^2
+    if (!is.finite(det) || det <= 1e-12 || cur$h00 >= 0) break
+    d0 <- -( cur$h11*cur$g0 - cur$h01*cur$g1) / det
+    d1 <- -(-cur$h01*cur$g0 + cur$h00*cur$g1) / det
+    step <- 1
+    for (bt in 1:40) {
+      b0_try <- beta0+step*d0; b1_try <- beta1+step*d1
+      cand <- obj_and_gh(b0_try, b1_try)
+      if (is.finite(cand$obj) && cand$obj >= cur_obj - 1e-10) break
+      step <- step/2
+    }
+    beta0 <- beta0+step*d0; beta1 <- beta1+step*d1
+    cur <- obj_and_gh(beta0, beta1)
+    if (abs(step*d0) < 1e-10 && abs(step*d1) < 1e-10) break
+    cur_obj <- cur$obj
+  }
+  c(beta0=beta0, beta1=beta1)
+}
+
+fit_gva <- function(X, Y, family = c("poisson","gamma"), nu = 2, max_iter = 150, tol = 1e-7) {
+  family <- match.arg(family)
+  m <- nrow(X); n <- ncol(X)
+  Ybar <- rowSums(Y)
+  Xvec <- as.vector(X)
+  Yvec <- as.vector(Y)
+  fam_glm <- if (family == "poisson") poisson(link="log") else Gamma(link="log")
+  init_fit <- suppressWarnings(glm(Yvec ~ Xvec, family = fam_glm))
+  beta0 <- unname(coef(init_fit)[1]); beta1 <- unname(coef(init_fit)[2])
+  sigma2 <- 0.3
+  mu  <- rep(0, m)
+  lam <- rep(0.1, m)
+  for (it in 1:max_iter) {
+    eta_fix <- beta0 + beta1 * X
+    if (family == "poisson") {
+      Bi <- rowSums(exp(eta_fix))
+      es <- e_step_poisson(mu, lam, Bi, Ybar, sigma2)
+    } else {
+      Di <- rowSums(Y * exp(-eta_fix))
+      es <- e_step_gamma(mu, lam, Di, sigma2, nu, n)
+    }
+    mu <- es$mu; lam <- es$lam
+    offset_i <- if (family == "poisson") mu + lam/2 else -mu + lam/2
+    offset_full <- rep(offset_i, times = n)
+    bnew <- robust_beta_update(Xvec, Yvec, offset_full, family, nu, beta0, beta1)
+    beta0_new <- unname(bnew["beta0"]); beta1_new <- unname(bnew["beta1"])
+    sigma2_target <- mean(mu^2 + lam)
+    damp <- 0.5
+    sigma2_new <- sigma2 + damp*(sigma2_target - sigma2)
+    delta <- abs(beta0_new-beta0) + abs(beta1_new-beta1) + abs(sigma2_new-sigma2)
+    beta0 <- beta0_new; beta1 <- beta1_new; sigma2 <- sigma2_new
+    if (delta < tol) break
+  }
+  c(beta0 = unname(beta0), beta1 = unname(beta1), sigma2 = sigma2, iters = it)
+}
+```
+
+### Exact MLE(Adaptive Gauss-Hermite Quadrature) 코드
+
+그룹별 사후분포의 mode를 먼저 Newton으로 찾고(adaptive), 그 mode 주변으로 quadrature 노드를 재배치해서 정확한 주변가능도를 수치적분한다. GVA와 나란히 비교하는 참조(gold standard) 추정량이다.
+
+```{r}
+#| eval: false
+exact_negloglik <- function(par, X, Y, family, nu = 2, n_quad = 11) {
+  beta0 <- par[1]; beta1 <- par[2]; sigma2 <- exp(par[3])
+  gh <- gauss.quad(n_quad, kind = "hermite")
+  xk <- gh$nodes; wk <- gh$weights
+  m <- nrow(X); n <- ncol(X)
+  eta_fix <- beta0 + beta1 * X
+  ETA_CLIP <- 30
+  grad_hess_vec <- function(u_hat) {
+    eta <- pmin(pmax(eta_fix + u_hat, -ETA_CLIP), ETA_CLIP)
+    if (family == "poisson") {
+      muv <- exp(eta)
+      g <- rowSums(Y - muv) - u_hat/sigma2
+      h <- -rowSums(muv) - 1/sigma2
+    } else {
+      ev <- exp(-eta)
+      g <- rowSums(-nu + nu*Y*ev) - u_hat/sigma2
+      h <- -rowSums(nu*Y*ev) - 1/sigma2
+    }
+    list(g=g, h=h)
+  }
+  u_hat <- rep(0, m)
+  for (nt in 1:25) {
+    gh_ <- grad_hess_vec(u_hat)
+    g <- gh_$g; h <- gh_$h
+    bad <- !is.finite(g) | !is.finite(h) | h >= -1e-10
+    h[bad] <- -1; g[bad] <- 0
+    step <- -g/h
+    step[!is.finite(step)] <- 0
+    step <- pmax(pmin(step, 5), -5)
+    u_hat <- u_hat + step
+    if (max(abs(step)) < 1e-10) break
+  }
+  h_at_mode <- grad_hess_vec(u_hat)$h
+  h_at_mode[!is.finite(h_at_mode) | h_at_mode >= 0] <- -1
+  s <- sqrt(-1/h_at_mode)
+  ll_mat <- matrix(0, nrow = m, ncol = n_quad)
+  for (k in 1:n_quad) {
+    u_k <- u_hat + sqrt(2)*s*xk[k]
+    eta_k <- pmin(pmax(eta_fix + u_k, -ETA_CLIP), ETA_CLIP)
+    loglik_k <- if (family == "poisson") rowSums(dpois(Y, lambda = exp(eta_k), log = TRUE))
+                else rowSums(dgamma(Y, shape = nu, rate = nu/exp(eta_k), log = TRUE))
+    ll_mat[, k] <- loglik_k - u_k^2/(2*sigma2) + xk[k]^2
+  }
+  mx <- apply(ll_mat, 1, max)
+  wsum <- as.vector(exp(ll_mat - mx) %*% wk)
+  ll_total <- log(sqrt(2)*s) + mx + log(wsum) - 0.5*log(2*pi*sigma2)
+  out <- -sum(ll_total)
+  if (!is.finite(out)) out <- 1e10
+  out
+}
+
+fit_exact <- function(X, Y, family, nu = 2, n_quad = 11, start = c(0,0,0)) {
+  opt <- optim(start, exact_negloglik, X=X, Y=Y, family=family, nu=nu, n_quad=n_quad, method = "BFGS")
+  c(beta0 = opt$par[1], beta1 = opt$par[2], sigma2 = exp(opt$par[3]))
+}
+```

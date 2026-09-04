@@ -1,0 +1,228 @@
+---
+title: "2nd LMM code"
+#format: 
+#author: "Harlow Malloc"
+date: "2025-03-04"
+categories: [LMM, code, analysis]
+#image: "image.jpg"
+---
+
+```{r}
+#| message: false
+set.seed(2453)
+library(dplyr)
+library(tidyr)
+library(lme4)
+library(lmerTest)
+```
+
+## Linear Mixed Models for keyage children
+
+해당 데이터는 독일에 **EMOTIKON**라는 프로젝트로 초등학교 3학년의 아이들의 기초체력을 수년간 측정해서 아이들의 기초체력의 추세 혹은 코로나 전후로 변화가 있는 지 살펴본 결과이다.
+
+::: callout-tip
+#### 참고
+
+이 데이터의 경우는 반복측정자료 (longitudinal data)가 아니라 각 연도의 3학년 집단이 별도로 측정한 반복 단면(cross-sectional) 데이터이다.
+
+“The EMOTIKON project annually tests the physical fitness of all third-graders in the Federal State of Brandenburg, Germany.”
+:::
+
+```{r}
+df <- readRDS("/Users/yd/Library/CloudStorage/OneDrive-UOS/grad2022/jeongyd/sports/teich2023/data/key_2011_2022.rds")
+knitr::kable(df %>% head(10))
+sum(is.na(df)) # 결측값 없음
+```
+
+## 모형 설정
+
+여러가지 모형을 적용해보려고 한다.
+
+`df`에 들어 있는 변수가 다양하기에 논문에서 제시한 변수들을 참고해서 가장 간단한 모형부터 시작해서 복잡한 모형도 적용해보려한다.
+
+데이터프레임의 관측값이 70만개가 넘기에 시간이 오래걸리므로 1만명의 학생을 뽑아서 그 학생이 측정한 운동종목을 모두 가져오면 대략 5만개의 관측값을 가져올수 있다.
+
+```{r}
+id <- factor(df$Child)
+id_sampled <- sample(id, size = 10^4, replace = FALSE)
+df_sampled <- df[df$Child %in% id_sampled,]
+```
+
+정말 각 `Cohort`마다 학생들이 다른것일까 한 학생의 `Child` id가 2개 이상의 `Cohort` 즉, 2번 이상 반복측정하진 않았을까 확인해보는 방법을 써본다.
+
+```{r}
+# Child별로 그룹화하여 Cohort가 몇 개인지 세기
+df_summary <- df %>%
+  group_by(Child) %>%
+  summarise(
+    cohort_n = n_distinct(Cohort)
+  )
+table(df_summary$cohort_count > 1)
+```
+
+::: callout-tip
+#### 참고
+
+일부 학생들의 경우 6개의 운동종목을 다 관측되지 못한것 처럼 보이는 데 그 이유는 3표준편차를 벗어나는 사람들은 제거했다고 나와있다.
+
+For all tests, except for the one-legged-stance test, we excluded scores outside of a ±3 SD range. The one-legged-stance test was terminated after a maximum of 60 s, and scores larger than 60 s were not possible.
+:::
+
+가장 간단한 모형으로 계층모형이라 생각하면 level 1은 학교수준 level 2는 학생수준으로 랜덤효과만 준다.
+
+$$
+\begin{aligned}
+y_{ij} & = \mu + a_i + b_{ij} + \varepsilon_{ij} \\
+& \quad \text{where }\ i=1,\cdots,m, \quad \text{school}\\
+& \quad \quad \quad \quad j=1,\cdots,n_i,  \quad \text{child}
+\end{aligned}
+$$
+
+```{r}
+m0 <- lmer(zScore ~ (1 | School) + (1 | Child), data = df_sampled)
+summary(m0)
+```
+
+### 1. 기본 모형: Component(측정종목)만 포함한 모형
+
+$$
+\begin{aligned}
+y_{ijk} & = \mu + a_i + b_{ij} + \alpha_k + \varepsilon_{ijk} \\
+& \quad \text{where }\ i=1,\cdots,m, \quad \text{school}\\
+& \quad \quad \quad \quad j=1,\cdots,n_i, \quad \text{child} \\
+& \quad \quad \quad \quad k=1,2,3,4, \quad\ \text{component} 
+\end{aligned}
+$$
+
+```{r}
+m1 <- lmer(zScore ~ Component + (1 | School) + (1 | Child), data = df_sampled)
+summary(m1)
+```
+
+### 2. $m1$에서 나이 효과(a1)를 포함한 모형
+
+```{r}
+hist(df$a1, breaks = 15)
+```
+
+$$
+\begin{aligned}
+y_{ijk} & = \mu + a_i + b_{ij} + \alpha_k  + \beta x_{ij} + \varepsilon_{ijk} \\
+& \quad \text{where }\ i=1,\cdots,m, \\
+& \quad \quad \quad \quad j=1,\cdots,n_i, \\
+& \quad \quad \quad \quad k=1,2,3,4,
+\end{aligned}
+$$
+
+```{r}
+m2 <- lmer(zScore ~ Component + a1 + (1 | School) + (1 | Child), data = df_sampled)
+summary(m2)
+```
+
+#### 2-2. $a1$를 고정효과와 랜덤효과 둘다 둔다면?
+
+$$
+\begin{aligned}
+y_{ijk} & = \mu + a_i + b_{0ij} + \alpha_k  + \beta x_{ij} + b_{1ij}x_{ij} +  \varepsilon_{ijk} \\
+& = \alpha_k + (\mu + a_i + b_{0ij}) + (\beta + b_{1ij})x_{ij} + \varepsilon_{ijk} \\
+& \quad \text{where }\ i=1,\cdots,m, \\
+& \quad \quad \quad \quad j=1,\cdots,n_i, \\
+& \quad \quad \quad \quad k=1,2,3,4,
+\end{aligned}
+$$
+
+```{r}
+m2_2 <- lmer(zScore ~ Component + a1 + (1 | School) + (1 + a1 | Child), data = df_sampled)
+summary(m2_2)
+```
+
+### 3. 성별도 포함한 모형
+
+$$
+\begin{aligned}
+y_{ijk} & = \mu + a_i + b_{0ij} + \alpha_k  + \beta x_{ij} + b_{1ij}x_{ij} + \gamma_l + \varepsilon_{ijk} \\
+& = \alpha_k + \gamma_l + (\mu + a_i + b_{0ij}) + (\beta + b_{1ij})x_{ij} + \varepsilon_{ijk} \\
+& \quad \text{where }\ i=1,\cdots,m, \\
+& \quad \quad \quad \quad j=1,\cdots,n_i, \\
+& \quad \quad \quad \quad k=1,2,3,4, \\
+& \quad \quad \quad \quad l=1,2,
+\end{aligned}
+$$
+
+고정효과로 성별만 추가 했는데 여기선 random effect에 상관계수가 1로 나오면서 모형이 완전히 식별되지 않는 상황이 나온다.
+
+단지 설명변수를 하나만 넣었을 뿐인데 그것도 fixed effect만 넣었을 뿐인데 이것이 random effect에 큰 영향을 주는 과정을 모르겠다.
+
+```{r}
+m3 <- lmer(zScore ~ Component + a1 + Sex + (1 | School) + (1 + a1 | Child), data = df_sampled)
+summary(m3)
+```
+
+#### 3-2. 성별(Sex)과 Component(측정종목)의 상호작용 모형
+
+모형식 수정하기
+
+$$
+\begin{aligned}
+y_{ijkl} & = \mu + a_i + b_{0ij} + \alpha_k  + \beta x_{ij} + b_{1ij}x_{ij} + \gamma_l + (\alpha\gamma)_{kl}+ \varepsilon_{ijkl} \\
+& = \alpha_k + \gamma_l + (\mu + a_i + b_{0ij}) + (\beta + b_{1ij})x_{ij} + (\alpha\gamma)_{kl}+ \varepsilon_{ijkl} \\
+& \quad \text{where }\ i=1,\cdots,m, \quad \text{school} \\
+& \quad \quad \quad \quad j=1,\cdots,n_i, \quad \text{child} \\
+& \quad \quad \quad \quad k=1,2,3,4, \quad \ \text{component}\\
+& \quad \quad \quad \quad l=1,2, \quad \quad \quad \ \text{sex}
+\end{aligned}
+$$
+
+```{r}
+m3_2 <- lmer(zScore ~ Component * Sex + a1 + (1 | School) + (1 + a1 | Child), data = df_sampled)
+summary(m3_2)
+```
+
+### 4. $m3_2$에서 추가로 학교 수준에서 Component(측정종목)의 기울기를 무작위로 허용한 모형
+
+$$
+\begin{aligned}
+y_{ijkl} & = \mu + a_{0i} + a_{1ik}x_i + b_{ij} + \alpha_k  + \beta x_{ij} + \gamma_l + (\alpha\gamma)_{kl}+ \varepsilon_{ijkl} \\
+& = \alpha_k + \gamma_l + (\mu + a_{0i} + b_{ij}) + (\beta + a_{1ik})x_{ij} + (\alpha\gamma)_{kl}+ \varepsilon_{ijkl} \\
+& \quad \text{where }\ i=1,\cdots,m, \\
+& \quad \quad \quad \quad j=1,\cdots,n_i \\
+& \quad \quad \quad \quad k=1,2,3,4 \\
+& \quad \quad \quad \quad l=1,2
+\end{aligned}
+$$
+
+```{r}
+m4 <- lmer(zScore ~ Component * Sex + a1 + (1 + Component | School) + (1 | Child), data = df_sampled)
+summary(m4)
+```
+
+5.  코호트(Cohort) 추세(선형 및 이차 추세)를 포함한 모형 \< 비선형 모형
+
+모형설정을 못해서 이건 다음으로 미루겠습니다.
+
+```{r}
+m5 <- lmer(zScore ~ Component + Cohort + Cohort^2 + (1 | School) + (1 | Child), data = df_sampled)
+summary(m5)
+```
+
+6.  논문에서 제공한 Julia 코드 모형
+
+결과가 나오지 않는다.
+
+```{r}
+#| eval: false
+model_formula <- as.formula(
+  paste("zScore ~ 1 +", 
+        "Component + Component*(a1 + Sex + cvd1_R + cvd2_R + cvd3_R + pre1_R + pre2_R + pre3_R)",
+        "+ (1 + Component + a1 + Sex | School)",
+        "+ (0 + cvd1_R + cvd2_R + cvd3_R + pre1_R + pre2_R + pre3_R || School)",
+        "+ (1 + Component | Child)"
+  )
+)
+
+# 모델 적합
+m6 <- lmer(model_formula, data = df_sampled)
+
+# 결과 확인 (lmerTest 패키지를 이용해 고정 효과의 p-value도 확인 가능)
+summary(m6)
+```
