@@ -4,7 +4,7 @@ library(tidycensus)
 
 
 # 2) API 키 등록 (한 번만 하면 됨)  
-census_api_key("6b2592610fc13c663da54fcf11a521d0c498d2b9", install = TRUE)
+census_api_key("YOUR_CENSUS_API_KEY", install = TRUE)
 
 # 이후 R 세션 재시작 또는 아래로 .Renviron 읽기  
 readRenviron("~/.Renviron")
