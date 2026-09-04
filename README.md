@@ -40,3 +40,7 @@ GVA와 AGHQ를 비교하는 시뮬레이션 연구, Polya-Gamma 샘플링, 준�
 통계학과 대학원 세미나에서 GLMM의 계산방법(근사 추론)을 주제로 진행한 개인 스터디 기록입니다.
 이론(원논문이 증명한 것)과 구현(직접 짠 코드의 시뮬레이션 결과)을 계속 서로 대조하면서
 검증하는 방식으로 작업했습니다 — `discuss_prompt.md`가 그 과정을 보여주는 예시입니다.
+
+## Acknowledgement
+
+This repository was developed with support from the 서울시립대학교 데이터 사이언스 플러스 차세대 융합인재 양성사업단 – http://dsplus.uos.ac.kr/
