@@ -43,4 +43,5 @@ GVA와 AGHQ를 비교하는 시뮬레이션 연구, Polya-Gamma 샘플링, 준�
 
 ## Acknowledgement
 
-This repository was developed with support from the 서울시립대학교 데이터 사이언스 플러스 차세대 융합인재 양성사업단 – http://dsplus.uos.ac.kr/
+(국문) 이 논문은 정부(과학기술정보통신부)의 재원으로 한국연구재단의 지원을 받아 수행된 연구임 (NO. RS-2022-NR068754)
+(영문) This research was supported by the National Research Foundation of Korea(NRF) grant funded by the Korea government(MSIT) (NO. RS-2022-NR068754)
