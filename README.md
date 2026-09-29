@@ -44,4 +44,5 @@ GVA와 AGHQ를 비교하는 시뮬레이션 연구, Polya-Gamma 샘플링, 준�
 ## Acknowledgement
 
 (국문) 이 논문은 정부(과학기술정보통신부)의 재원으로 한국연구재단의 지원을 받아 수행된 연구임 (NO. RS-2022-NR068754)
+
 (영문) This research was supported by the National Research Foundation of Korea(NRF) grant funded by the Korea government(MSIT) (NO. RS-2022-NR068754)
